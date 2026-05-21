@@ -66,6 +66,10 @@ is
 
    ERR_INCORRECT_IEEE754_FORMAT : constant Integer := 105;
 
+   --  ACN deferred patching: shared determinant patched with two
+   --  different values across calls (consistency check failure).
+   ERR_ACN_DET_CONSISTENCY_MISMATCH : constant Integer := 203;
+
    function GetZeroBasedCharIndex
      (CharToSearch : Character; AllowedCharSet : String) return Integer with
       Pre => AllowedCharSet'First <= AllowedCharSet'Last and
@@ -91,8 +95,8 @@ is
      (if Left = Right then True elsif Left = 0.0 then Right = 0.0
       elsif (Left > 0.0 and Right < 0.0) or (Left < 0.0 and Right > 0.0) then
         False
-      elsif abs (Left) > abs (Right) then abs (Right) / abs (Left) >= 0.99999
-      else abs (Left) / abs (Right) >= 0.99999);
+      elsif abs Left > abs Right then abs Right / abs Left >= 0.99999
+      else abs Left / abs Right >= 0.99999);
 
    function OctetString_equal
      (len1 : Integer; len2 : Integer; arr1 : OctetBuffer; arr2 : OctetBuffer)

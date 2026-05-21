@@ -136,6 +136,13 @@ type State = {
 
 let emptyState = {currErrorCode=0; curErrCodeNames=Set.empty; alphaIndex=0; alphaFuncs=[]; typeIdsSet=Map.empty; newTypesMap = new Dictionary<ReferenceToType, System.Object>(); icdHashes = Map.empty; functionCalls=Map.empty}
 
+/// Parent context passed from the fold's pre-functions to child callbacks.
+/// Allows seqAcnChildFunc to know about the parent SEQUENCE's deferred children.
+type ParentData =
+    | SequenceParentData of deferredAcnChildren: Set<string>
+    | ChoiceParentData
+    | SequenceOfParentData
+
 let addFunctionCallToState (state:State) (caller:Caller) (callee:Callee) =
     match state.functionCalls.TryFind caller  with
     | Some lst -> {state with functionCalls = state.functionCalls.Add(caller, callee::lst)}
@@ -442,11 +449,14 @@ type NestingScope = {
     uperSiblingMaxSize: bigint option
     // The parents are ordered in ascendant (i.e. the head is a child of the second parent etc.)
     parents: (CodegenScope * Asn1AcnAst.Asn1Type) list
+    // When a parent SEQUENCE has a post-encoding/pre-decoding function, this holds its
+    // bitStreamPositions local variable name so nested SEQUENCEs can use it for save-position fields.
+    parentSavePositionVar: string option
 } with
     static member init (acnOuterMaxSize: bigint) (uperOuterMaxSize: bigint) (parents: (CodegenScope * Asn1AcnAst.Asn1Type) list): NestingScope =
         {acnOuterMaxSize = acnOuterMaxSize; uperOuterMaxSize = uperOuterMaxSize; nestingLevel = 0I; nestingIx = 0I;
         acnRelativeOffset = 0I; uperRelativeOffset = 0I; acnOffset = 0I; uperOffset = 0I; acnSiblingMaxSize = None; uperSiblingMaxSize = None;
-        parents = parents}
+        parents = parents; parentSavePositionVar = None}
     member this.isInit: bool = this.nestingLevel = 0I && this.nestingIx = 0I
 
 type UPERFuncBodyResult = {
@@ -485,6 +495,7 @@ type AcnFuncBodyResult = {
     resultExpr          : string option
     auxiliaries         : string list
     icdResult           : IcdArgAux option
+    userDefinedFunctions : UserDefinedFunction list //a list of user defined functions prototypes used in this function body. Emitted at the begining of the source file
 }
 
 type XERFuncBodyResult = {
@@ -529,6 +540,7 @@ type AcnFunction = {
     funcBody            : AcnFuncBody
     funcBodyAsSeqComp   : AcnFuncBodySeqComp
     isTestVaseValid     : AutomaticTestCase -> bool
+    userDefinedFunctions : UserDefinedFunction list //a list of user defined functions prototypes used in this function body. Emitted at the begining of the source file
     icdTas              : IcdTypeAss option (* always present in Encode, always None in Decode *)
 }
 
@@ -998,6 +1010,7 @@ and AcnChildUpdateResult = {
     testCaseFnc : AutomaticTestCase -> TestCaseValue option
     errCodes    : ErrorCode list
     localVariables      : LocalVariable list
+    //userDefinedFunctions : UserDefinedFunction list //a list of user defined functions prototypes used in this function body. Emitted at the begining of the source file
 }
 
 and DastAcnParameter = {

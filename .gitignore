@@ -1,4 +1,6 @@
 shared_workdir/
+overnight/
+logs/overnight-*/
 .metals
 .vscode
 .idea
@@ -25,6 +27,8 @@ Backend2.ST/ACN.fs
 Backend2.ST/ASN.fs
 Backend2.ST/bin/
 Asn1.userprefs
+*.orig
+*.rej
 */bin/
 */obj/
 *.suo
@@ -409,6 +413,8 @@ Asn1.userprefs
 /SPARK_RTL/adaasn1rtl.o
 /SPARK_RTL/spark_io_05.ali
 /SPARK_RTL/spark_io_05.o
+/.claude
+/q
 /mantis/0000411/out_c
 /mantis/0000411/out_ada
 /mantis/0000444 - Custom templates/custom_icd_acn.html
@@ -1413,3 +1419,4 @@ Inputs/
 asn1scc/Properties/launchSettings_UPER.json
 /dotnet-debian.SENTINEL
 /.claude/settings.local.json
+acnv2/*

@@ -131,31 +131,44 @@ Token NT(ByteStream* pByteStrm) {
 	Token ret;
 	char spChrs[] = { '<', '>', '/', '=', '"', 0 };
 	char *tmp;
+	size_t written = 0;
 	memset(&ret, 0x0, sizeof(Token));
 
-	while (isspace(pByteStrm->buf[pByteStrm->currentByte]))
+	while (pByteStrm->currentByte < pByteStrm->count && isspace(pByteStrm->buf[pByteStrm->currentByte]))
 		pByteStrm->currentByte++;
 
-	if ((pByteStrm->buf[pByteStrm->currentByte] == '<') && (pByteStrm->buf[pByteStrm->currentByte + 1] == '?')) {
+	if (pByteStrm->currentByte >= pByteStrm->count)
+		return ret;
+
+	if (pByteStrm->currentByte + 1 < pByteStrm->count &&
+		(pByteStrm->buf[pByteStrm->currentByte] == '<') && (pByteStrm->buf[pByteStrm->currentByte + 1] == '?')) {
 		pByteStrm->currentByte++;
-		while (!((pByteStrm->buf[pByteStrm->currentByte - 1] == '?') && (pByteStrm->buf[pByteStrm->currentByte] == '>')))
+		while (pByteStrm->currentByte < pByteStrm->count &&
+			!((pByteStrm->buf[pByteStrm->currentByte - 1] == '?') && (pByteStrm->buf[pByteStrm->currentByte] == '>')))
 			pByteStrm->currentByte++;
 		pByteStrm->currentByte++;
-		while (isspace(pByteStrm->buf[pByteStrm->currentByte]))
+		while (pByteStrm->currentByte < pByteStrm->count && isspace(pByteStrm->buf[pByteStrm->currentByte]))
 			pByteStrm->currentByte++;
 	}
 
-	if ((pByteStrm->buf[pByteStrm->currentByte] == '<') && (pByteStrm->buf[pByteStrm->currentByte + 1] == '!') && (pByteStrm->buf[pByteStrm->currentByte + 2] == '-') && (pByteStrm->buf[pByteStrm->currentByte + 3] == '-')) {
+	if (pByteStrm->currentByte >= pByteStrm->count)
+		return ret;
+
+	if (pByteStrm->currentByte + 3 < pByteStrm->count &&
+		(pByteStrm->buf[pByteStrm->currentByte] == '<') && (pByteStrm->buf[pByteStrm->currentByte + 1] == '!') && (pByteStrm->buf[pByteStrm->currentByte + 2] == '-') && (pByteStrm->buf[pByteStrm->currentByte + 3] == '-')) {
 		pByteStrm->currentByte++;
 		pByteStrm->currentByte++;
-		while (!((pByteStrm->buf[pByteStrm->currentByte - 2] == '-') && (pByteStrm->buf[pByteStrm->currentByte - 1] == '-') && (pByteStrm->buf[pByteStrm->currentByte] == '>')))
+		while (pByteStrm->currentByte < pByteStrm->count &&
+			!((pByteStrm->buf[pByteStrm->currentByte - 2] == '-') && (pByteStrm->buf[pByteStrm->currentByte - 1] == '-') && (pByteStrm->buf[pByteStrm->currentByte] == '>')))
 			pByteStrm->currentByte++;
 		pByteStrm->currentByte++;
-		while (isspace(pByteStrm->buf[pByteStrm->currentByte]))
+		while (pByteStrm->currentByte < pByteStrm->count && isspace(pByteStrm->buf[pByteStrm->currentByte]))
 			pByteStrm->currentByte++;
 	}
 
-	//if (pByteStrm->buf[pByteStrm->currentByte] =
+	if (pByteStrm->currentByte >= pByteStrm->count)
+		return ret;
+
 	tmp = strchr(spChrs, pByteStrm->buf[pByteStrm->currentByte]);
 	if (tmp != NULL) {
 		ret.TokenID = pByteStrm->buf[pByteStrm->currentByte];
@@ -165,10 +178,13 @@ Token NT(ByteStream* pByteStrm) {
 	}
 
 	tmp = &ret.Value[0];
-	while (isPartOfID((char)pByteStrm->buf[pByteStrm->currentByte])) {
+	while (pByteStrm->currentByte < pByteStrm->count &&
+		isPartOfID((char)pByteStrm->buf[pByteStrm->currentByte]) &&
+		written < sizeof(ret.Value) - 1) {
 		ret.TokenID = WORD_ID;
 		*tmp = (char)pByteStrm->buf[pByteStrm->currentByte];
 		tmp++;
+		written++;
 		pByteStrm->currentByte++;
 	}
 
@@ -245,8 +261,10 @@ flag Xer_EncodePrimitiveElement(ByteStream* pByteStrm, const char* elementTag, c
 }
 
 
-flag Xer_DecodePrimitiveElement(ByteStream* pByteStrm, const char* elementTag, char* pDecodedValue, int *pErrCode)
+
+flag Xer_DecodePrimitiveElement(ByteStream* pByteStrm, const char* elementTag, char* pDecodedValue, size_t maxLen, int *pErrCode)
 {
+	size_t written = 0;
 	Token t;
 	char c = 0x0;
 
@@ -297,9 +315,14 @@ flag Xer_DecodePrimitiveElement(ByteStream* pByteStrm, const char* elementTag, c
 			pDecodedValue++;
 			break;
 		}
+		if (written >= maxLen - 1) {
+			*pErrCode = ERR_INVALID_XML_FILE;
+			return FALSE;
+		}
 
 		*pDecodedValue = c;
 		pDecodedValue++;
+		written++;
 	}
 
 	PushBackChar(pByteStrm);
@@ -694,7 +717,7 @@ flag Xer_DecodeNull(ByteStream* pByteStrm, const char* elementTag, NullType* val
 {
 	char tmp[256];
 	memset(tmp, 0x0, sizeof(tmp));
-	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, pErrCode))
+	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, sizeof(tmp), pErrCode))
 		return FALSE;
 	*value = 0;
 	return TRUE;
@@ -708,7 +731,7 @@ flag Xer_DecodeInteger(ByteStream* pByteStrm, const char* elementTag, asn1SccSin
 {
 	char tmp[256];
 	memset(tmp, 0x0, sizeof(tmp));
-	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, pErrCode))
+	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, sizeof(tmp), pErrCode))
 		return FALSE;
 	*value = atoll(tmp);
 	return TRUE;
@@ -718,7 +741,7 @@ flag Xer_DecodePosInteger(ByteStream* pByteStrm, const char* elementTag, asn1Scc
 {
 	char tmp[256];
 	memset(tmp, 0x0, sizeof(tmp));
-	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, pErrCode))
+	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, sizeof(tmp), pErrCode))
 		return FALSE;
 	*value = strtoull(tmp, NULL, 10);
 	return TRUE;
@@ -739,12 +762,12 @@ flag Xer_DecodeBoolean(ByteStream* pByteStrm, const char* elementTag, flag* valu
 
 	if (strcmp(tmp, "true") == 0) {
 		*value = TRUE;
-		if (!Xer_DecodePrimitiveElement(pByteStrm, "true", tmp, pErrCode))
+		if (!Xer_DecodePrimitiveElement(pByteStrm, "true", tmp, sizeof(tmp), pErrCode))
 			return FALSE;
 	}
 	else {
 		*value = FALSE;
-		if (!Xer_DecodePrimitiveElement(pByteStrm, "false", tmp, pErrCode))
+		if (!Xer_DecodePrimitiveElement(pByteStrm, "false", tmp, sizeof(tmp), pErrCode))
 			return FALSE;
 	}
 
@@ -768,7 +791,7 @@ flag Xer_DecodeEnumerated(ByteStream* pByteStrm, const char* elementTag, char* v
 	if (!Xer_LA_NextElementTag(pByteStrm, value))
 		return FALSE;
 
-	if (!Xer_DecodePrimitiveElement(pByteStrm, value, tmp, pErrCode))
+	if (!Xer_DecodePrimitiveElement(pByteStrm, value, tmp, sizeof(tmp), pErrCode))
 		return FALSE;
 
 	if (hasExtTag)
@@ -782,16 +805,16 @@ flag Xer_DecodeReal(ByteStream* pByteStrm, const char* elementTag, double* value
 {
 	char tmp[256];
 	memset(tmp, 0x0, sizeof(tmp));
-	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, pErrCode))
+	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, sizeof(tmp), pErrCode))
 		return FALSE;
 	*value = atof(tmp);
 	return TRUE;
 }
 
 
-flag Xer_DecodeString(ByteStream* pByteStrm, const char* elementTag, char* value, int *pErrCode)
+flag Xer_DecodeString(ByteStream* pByteStrm, const char* elementTag, char* value, size_t valSize, int *pErrCode)
 {
-	return Xer_DecodePrimitiveElement(pByteStrm, elementTag, value, pErrCode);
+	return Xer_DecodePrimitiveElement(pByteStrm, elementTag, value, valSize, pErrCode);
 }
 
 
@@ -819,7 +842,7 @@ flag Xer_DecodeOctetString(ByteStream* pByteStrm, const char* elementTag, byte v
 	int i;
 	int j = 0;
 	memset(tmp, 0x0, sizeof(tmp));
-	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, pErrCode))
+	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, sizeof(tmp), pErrCode))
 		return FALSE;
 
 	len = (int)strlen(tmp);
@@ -860,7 +883,7 @@ flag Xer_DecodeObjectIdentifier(ByteStream* pByteStrm, const char* elementTag, A
 	int j = 0;
 	char delim[] = ".";
 	memset(tmp, 0x0, sizeof(tmp));
-	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, pErrCode))
+	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, sizeof(tmp), pErrCode))
 		return FALSE;
 
 	len = (int)strlen(tmp);
@@ -913,7 +936,7 @@ flag Xer_DecodeBitString(ByteStream* pByteStrm, const char* elementTag, byte val
 	int j = 0;
 
 	memset(tmp, 0x0, sizeof(tmp));
-	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, pErrCode))
+	if (!Xer_DecodePrimitiveElement(pByteStrm, elementTag, tmp, sizeof(tmp), pErrCode))
 		return FALSE;
 
 	len = (int)strlen(tmp);
@@ -992,11 +1015,23 @@ flag Xer_NextStartElementIs(ByteStream* pByteStrm, const char* elementTag)
 		return FALSE;
 	}
 
-	if (NT(pByteStrm).TokenID != '>') {
-		pByteStrm->currentByte = save;
-		return FALSE;
+	t = NT(pByteStrm);
+	if (t.TokenID == '/') {
+		if (NT(pByteStrm).TokenID == '>') {
+			pByteStrm->currentByte = save;
+			return TRUE;
+		}
+		else {
+			pByteStrm->currentByte = save;
+			return FALSE;
+		}
 	}
-
+	else {
+		if (t.TokenID != '>') {
+			pByteStrm->currentByte = save;
+			return FALSE;
+		}
+	}
 
 	pByteStrm->currentByte = save;
 	return TRUE;

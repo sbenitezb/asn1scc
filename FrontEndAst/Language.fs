@@ -32,6 +32,8 @@ type Acn_parts = {
 }
 type Initialize_parts = {
     zeroIA5String_localVars             : int -> LocalVariable list
+    zeroOctetString_localVars           : int -> LocalVariable list
+    zeroBitString_localVars             : int -> LocalVariable list
     choiceComponentTempInit             : bool
     initMethSuffix                      : Asn1TypeKind -> string // TODO REMOVE?
 }
@@ -206,6 +208,12 @@ type SequenceOptionalChild = {
 
 type AcnFuncBody = State -> ErrorCode -> (AcnGenericTypes.RelativePath * AcnGenericTypes.AcnParameter) list -> NestingScope -> CodegenScope -> (AcnFuncBodyResult option) * State
 
+/// Quadruple για deferred patching:
+///   (initFuncName, patchFuncName, nBitsOpt, uperMinOffset)
+/// nBitsOpt = Some n για ConstSize encoders που δέχονται bit-width· None για fixed-size (U8, U16, ...).
+/// uperMinOffset = UPER minimum offset (≠0 μόνο σε Integer_uPER fixed-size). Όταν ≠0, ο PatchDet γράφει (value-offset).
+type DetFunctionNames = string * string * BigInteger option * BigInteger
+
 [<AbstractClass>]
 type ILangGeneric () =
     abstract member ArrayStartIndex : int
@@ -224,7 +232,7 @@ type ILangGeneric () =
     abstract member asn1SccIntValueToString : BigInteger -> unsigned: bool -> string;
     abstract member intValueToString : BigInteger -> Asn1AcnAst.IntegerClass -> string;
     abstract member doubleValueToString : double -> string
-    abstract member initializeString : int -> string
+    abstract member initializeString :BigInteger option -> int -> string    //the ascii code to use for initialization, and the length of the string
     abstract member supportsInitExpressions : bool
     abstract member setNamedItemBackendName0 : Asn1Ast.NamedItem -> string -> Asn1Ast.NamedItem
     abstract member getNamedItemBackendName0 : Asn1Ast.NamedItem -> string
@@ -247,6 +255,31 @@ type ILangGeneric () =
     abstract member removeFunctionFromHeader : string -> string -> string
     abstract member removeFunctionFromBody : string -> string -> string
 
+    /// ACN deferred-patching runtime names per language.
+    /// Returns (InitDet, PatchDet, nBitsOpt, uperMinOffset) for the given inserted-field type.
+    /// Returns None when the language/type combo doesn't support deferred patching.
+    /// Default: None (Ada/Scala don't yet implement --acn-v2).
+    abstract member getDeferredDetFunctions : Asn1AcnAst.AcnInsertedType -> DetFunctionNames option
+    /// Compute a target-language source-code expression for the wire fallback value
+    /// of a deferred determinant that was never patched at runtime.
+    /// Default: "0" (Ada/Scala don't yet implement --acn-v2).
+    abstract member computeDeferredFallbackValue : Asn1AcnAst.AcnInsertedType -> BigInteger -> string
+
+    /// Wrap the body of a closure-converted (--acn-v2) specialized function
+    /// with language-specific suppression of "dead code / unused symbol"
+    /// diagnostics.  The public TAS-style wrapper that some backends emit
+    /// alongside the working `_aux` body is never called by the deferred
+    /// path (callers invoke `_aux` directly), so warnings about it being
+    /// unreferenced must be silenced under -Werror-equivalent flags.
+    /// Default: identity (C and Scala don't need this).
+    abstract member wrapDeferredSpecBody : body:string -> string
+
+    /// Mangle a synthetic local-variable name used by the --acn-v2 deferred
+    /// patching backend (e.g., "patchDetVal", "patchDetStrVal") to a form
+    /// the target language accepts.  C prepends `_` for compiler-generated
+    /// locals (preserves byte-identity with master output); Ada cannot use
+    /// leading underscore identifiers.  Default: identity.
+    abstract member acnDeferredTempVarName : baseName:string -> string
 
     abstract member getRtlFiles : Asn1Encoding list -> string list -> string list
 
@@ -369,6 +402,10 @@ type ILangGeneric () =
         sourceCode
     default this.removeFunctionFromBody (sourceCode: string) (functionName: string) : string =
         sourceCode
+    default _.getDeferredDetFunctions _ = None
+    default _.computeDeferredFallbackValue _ _ = "0"
+    default _.wrapDeferredSpecBody body = body
+    default _.acnDeferredTempVarName baseName = baseName
     default this.real_annotations = []
 
     default this.extractEnumClassName (prefix: string) (varName: string) (internalName: string): string = ""

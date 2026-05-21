@@ -166,7 +166,7 @@ ret = Xer_EncodeString(pByteStrm, <sTag>, <p>, pErrCode, <nLevel>);
 >>
 
 String_decode(p, sTag, nLevel, soCheckExp, sErrCode) ::= <<
-ret = Xer_DecodeString(pByteStrm, <sTag>, <p>, pErrCode);
+ret = Xer_DecodeString(pByteStrm, <sTag>, <p>, sizeof(<p>), pErrCode);
 <if(soCheckExp)><soCheckExp><endif>
 *pErrCode = ret  ? 0 : <sErrCode>;
 >>
@@ -263,6 +263,11 @@ if (ret) {
     <sI> = 0;
     while(ret && !Xer_NextEndElementIs(pByteStrm, <sTag>))
     {
+        if (<sI> >= <nSizeMax>) {
+            ret = FALSE;
+            *pErrCode = <sErrCode>;
+            break;
+        }
 	    <sChildBody>
 	    <sI>++;
 	    <if(!bFixedSize)><p><sAcc>nCount++;<endif>

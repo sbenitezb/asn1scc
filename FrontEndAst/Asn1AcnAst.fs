@@ -803,7 +803,7 @@ and Choice = {
 
     acnMaxSizeInBits    : BigInteger
     acnMinSizeInBits    : BigInteger
-    acnParameters       : AcnParameter list
+    //acnParameters       : AcnParameter list
     // detArg              : RelativePath option
     acnArgs             : RelativePath list
     acnLoc              : SrcLoc option
@@ -930,6 +930,7 @@ type AcnDependencyKind =
         member this.isString =
             match this with
             | AcnDepIA5StringSizeDeterminant _ -> true
+            | AcnDepPresenceStr _ -> true
             | _ -> false
 
 type Determinant =

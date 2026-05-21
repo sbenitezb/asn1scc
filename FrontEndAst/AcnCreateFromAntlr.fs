@@ -43,10 +43,14 @@ let private getIntSizeProperty  errLoc (props:GenericAcnProperty list) =
     | Some (GP_NullTerminated   )   ->
         match tryGetProp props (fun x -> match x with TERMINATION_PATTERN e -> Some e | _ -> None) with
         | Some bitPattern    ->
+            printfn "bitPattern: %A" bitPattern
+            printfn "bitPattern.Value.Length: %A" bitPattern.Value.Length
             match bitPattern.Value.Length % 8 <> 0 with
             | true  -> raise(SemanticError(bitPattern.Location, sprintf "termination-pattern value must be a sequence of bytes"  ))
             | false ->
                 let ba = bitStringValueToByteArray bitPattern |> Seq.toList
+                if ba.Length > 10 then
+                    raise(SemanticError(bitPattern.Location, "termination-pattern cannot exceed 10 bytes"))
                 Some(AcnGenericTypes.IntNullTerminated ba)
         | None      -> Some(AcnGenericTypes.IntNullTerminated ([byte 0]))
     | Some (GP_SizeDeterminant _)   -> raise(SemanticError(errLoc ,"Expecting an Integer value or an ACN constant as value for the size property"))
@@ -70,6 +74,8 @@ let private getStringSizeProperty (minSize:BigInteger) (maxSize:BigInteger) errL
             | true  -> raise(SemanticError(bitPattern.Location, sprintf "termination-pattern value must be a sequence of bytes"  ))
             | false ->
                 let ba = bitStringValueToByteArray bitPattern |> Seq.toList
+                if ba.Length > 10 then
+                    raise(SemanticError(bitPattern.Location, "termination-pattern cannot exceed 10 bytes"))
                 Some(AcnGenericTypes.StrNullTerminated ba)
         | None      -> Some(AcnGenericTypes.StrNullTerminated ([byte 0]))
     | Some (GP_SizeDeterminant fld)   -> (Some (AcnGenericTypes.StrExternalField fld))
@@ -780,6 +786,11 @@ let private mergeEnumerated (asn1: Asn1Ast.AstRoot) (lms:(ProgrammingLanguage*La
 
     let alignment = tryGetProp props (fun x -> match x with ALIGNTONEXT e -> Some e | _ -> None)
     let acnEncodingClass,  acnMinSizeInBits, acnMaxSizeInBits= AcnEncodingClasses.GetEnumeratedEncodingClass asn1.args.integerSizeInBytes items alignment loc acnProperties uperSizeInBits uperSizeInBits encodeValues
+
+    let acnErrLoc0 = match acnErrLoc with Some a -> a | None -> loc
+    let enumMinVal = items |> List.map(fun x -> x.acnEncodeValue) |> List.min
+    let enumMaxVal = items |> List.map(fun x -> x.acnEncodeValue) |> List.max
+    checkIntHasEnoughSpace acnEncodingClass false acnErrLoc0 enumMinVal enumMaxVal
 
     let validItems = items |> List.filter (Asn1Fold.isValidValueGeneric cons (fun a b -> a = b.Name.Value)) |> List.sortBy(fun x -> x.definitionValue)
 
@@ -1497,7 +1508,7 @@ let rec private mergeType  (asn1:Asn1Ast.AstRoot) (acn:AcnAst) (typeIdsSet : Map
 
             Choice ({Choice.children = mergedChildren; acnProperties = acnProperties; cons=cons; withcons = wcons;
                 uperMaxSizeInBits=indexSize+maxChildSize; uperMinSizeInBits=indexSize+minChildSize; acnMinSizeInBits =acnMinSizeInBits;
-                acnMaxSizeInBits=acnMaxSizeInBits; acnParameters = acnParameters; acnArgs = allAcnArgsSubsted; acnLoc = acnLoc; typeDef=typeDef; definitionOrRef=definitionOrRef; maxAlignment=maxAlignment}), chus
+                acnMaxSizeInBits=acnMaxSizeInBits; (*acnParameters = acnParameters;*) acnArgs = allAcnArgsSubsted; acnLoc = acnLoc; typeDef=typeDef; definitionOrRef=definitionOrRef; maxAlignment=maxAlignment}), chus
 
         | Asn1Ast.ReferenceType rf    ->
             let acnArguments = acnArgs
@@ -1525,7 +1536,7 @@ let rec private mergeType  (asn1:Asn1Ast.AstRoot) (acn:AcnAst) (typeIdsSet : Map
                 match t.Constraints@refTypeCons |> Seq.exists(fun c -> match c with Asn1Ast.WithComponentConstraint _ -> true | Asn1Ast.WithComponentsConstraint _ -> true | _ -> false) with
                 | true  -> acnType
                 | false -> mergeAcnEncodingSpecs acnType baseTypeAcnEncSpec
-            let hasAdditionalConstraints = restCons.Length > 0
+            let hasAdditionalConstraints = restCons.Length > 0 || withCompCons.Length > 0
             let inheritanceInfo = (Some {InheritanceInfo.modName = rf.modName.Value; tasName = rf.tasName.Value; hasAdditionalConstraints=hasAdditionalConstraints})
 
             //The current type definition path changes to this referenced type path, if this referenced type has no constraints (with component constraints are ignored)

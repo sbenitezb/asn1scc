@@ -302,6 +302,8 @@ flag Acn_Dec_Int_PositiveInteger_VarSize_LengthEmbedded(BitStream* pBitStrm, asn
 	asn1SccUint v = 0;
 	if (!BitStream_ReadByte(pBitStrm, &nBytes))
 		return FALSE;
+	if (nBytes > WORD_SIZE)
+		return FALSE;
 	for (i = 0; i<nBytes; i++) {
 		byte b = 0;
 		if (!BitStream_ReadByte(pBitStrm, &b))
@@ -498,6 +500,8 @@ flag Acn_Dec_Int_TwosComplement_VarSize_LengthEmbedded(BitStream* pBitStrm, asn1
 	flag isNegative = 0;
 	if (!BitStream_ReadByte(pBitStrm, &nBytes))
 		return FALSE;
+	if (nBytes > WORD_SIZE)
+		return FALSE;
 	for (i = 0; i<nBytes; i++) {
 		byte b = 0;
 		if (!BitStream_ReadByte(pBitStrm, &b))
@@ -598,11 +602,11 @@ void Acn_Enc_Int_BCD_VarSize_LengthEmbedded(BitStream* pBitStrm, asn1SccUint int
 flag Acn_Dec_Int_BCD_VarSize_LengthEmbedded(BitStream* pBitStrm, asn1SccUint* pIntVal)
 {
 	byte nNibbles = 0;
-	if (BitStream_ReadByte(pBitStrm, &nNibbles))
-		return Acn_Dec_Int_BCD_ConstSize(pBitStrm, pIntVal, nNibbles);
-
-	return FALSE;
-
+	if (!BitStream_ReadByte(pBitStrm, &nNibbles))
+		return FALSE;
+	if (nNibbles > 2 * WORD_SIZE)
+		return FALSE;
+	return Acn_Dec_Int_BCD_ConstSize(pBitStrm, pIntVal, nNibbles);
 }
 
 
@@ -855,16 +859,16 @@ flag Acn_Dec_UInt_ASCII_VarSize_NullTerminated(BitStream* pBitStrm, asn1SccUint*
 	memset(tmp, 0x0, 10);
 
 	//read null_character_size characters into the tmp buffer
-	for (int j = 0; j < (int)null_characters_size; j++) {
+	for (int j = 0; j < (int)sz; j++) {
 		if (!BitStream_ReadByte(pBitStrm, &(tmp[j])))
 			return FALSE;
 	}
 
 	while (memcmp(null_characters, tmp, sz) != 0) {
 		digit = tmp[0];
-		for (int j = 0; j < (int)null_characters_size - 1; j++)
+		for (int j = 0; j < (int)sz - 1; j++)
 			tmp[j] = tmp[j + 1];
-		if (!BitStream_ReadByte(pBitStrm, &(tmp[null_characters_size - 1])))
+		if (!BitStream_ReadByte(pBitStrm, &(tmp[sz - 1])))
 			return FALSE;
 
 		digit = (byte)((int)digit - '0');
@@ -1324,7 +1328,7 @@ flag Acn_Dec_String_Ascii_Null_Terminated_mult(BitStream* pBitStrm, asn1SccSint 
 	memset(tmp, 0x0, 10);
 	memset(strVal, 0x0, (size_t)max + 1);
 	//read null_character_size characters into the tmp buffer
-	for (int j = 0; j < (int)null_character_size; j++) {
+	for (int j = 0; j < (int)sz; j++) {
 		if (!BitStream_ReadByte(pBitStrm, &(tmp[j])))
 			return FALSE;
 	}
@@ -1333,9 +1337,9 @@ flag Acn_Dec_String_Ascii_Null_Terminated_mult(BitStream* pBitStrm, asn1SccSint 
 	while (i <= max && (memcmp(null_character, tmp, sz) != 0)) {
 		strVal[i] = tmp[0];
 		i++;
-		for (int j = 0; j < (int)null_character_size - 1; j++)
+		for (int j = 0; j < (int)sz - 1; j++)
 			tmp[j] = tmp[j + 1];
-		if (!BitStream_ReadByte(pBitStrm, &(tmp[null_character_size - 1])))
+		if (!BitStream_ReadByte(pBitStrm, &(tmp[sz - 1])))
 			return FALSE;
 	}
 
@@ -1372,6 +1376,8 @@ static flag Acn_Dec_String_CharIndex_private(BitStream* pBitStrm,
 	while (i<charactersToDecode) {
 		asn1SccSint charIndex = 0;
 		if (!BitStream_DecodeConstraintWholeNumber(pBitStrm, &charIndex, 0, charSetSize - 1))
+			return FALSE;
+		if (charIndex < 0 || charIndex >= charSetSize)
 			return FALSE;
 		strVal[i] = allowedCharSet[charIndex];
 		i++;
@@ -2049,6 +2055,44 @@ flag Acn_Dec_UInt_ASCII_VarSize_NullTerminatedUInt32(BitStream* pBitStrm, uint32
 	flag ret = Acn_Dec_UInt_ASCII_VarSize_NullTerminated(pBitStrm, &v, null_characters, null_characters_size);
 	*pIntVal = (uint32_t)v;
 	return ret;
+}
+
+
+/* IA5String deferred patching: reserve space for nChars x 7-bit characters */
+void Acn_InitDet_IA5String_FixSize(BitStream* bs, int nChars, AcnInsertedFieldRef* det) {
+    int i;
+    det->pos = Acn_BitStream_GetPos(bs);
+    det->is_set = FALSE;
+    det->value = 0;
+    det->str_value[0] = '\0';
+    for (i = 0; i < nChars * 7; i++)
+        BitStream_AppendBit(bs, 0);
+}
+
+/* IA5String deferred patching: write string value at saved position */
+flag Acn_PatchDet_IA5String_FixSize(const char* strVal, BitStream* bs, int nChars, AcnInsertedFieldRef* det, int* err) {
+    if (!det->is_set) {
+        int i, b;
+        int slen = (int)strlen(strVal);
+        AcnBitStreamPos cur = Acn_BitStream_GetPos(bs);
+        Acn_BitStream_SetPos(bs, det->pos);
+        for (i = 0; i < nChars; i++) {
+            byte ch = (i < slen) ? (byte)strVal[i] : 0x20;
+            for (b = 6; b >= 0; b--)
+                BitStream_AppendBit(bs, (byte)((ch >> b) & 1));
+        }
+        Acn_BitStream_SetPos(bs, cur);
+        strncpy(det->str_value, strVal, sizeof(det->str_value) - 1);
+        det->str_value[sizeof(det->str_value) - 1] = '\0';
+        det->is_set = TRUE;
+        return TRUE;
+    } else {
+        if (strncmp(det->str_value, strVal, (size_t)nChars) != 0) {
+            if (err) *err = ERR_ACN_DET_CONSISTENCY_MISMATCH;
+            return FALSE;
+        }
+        return TRUE;
+    }
 }
 
 
