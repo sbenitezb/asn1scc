@@ -1,0 +1,266 @@
+{
+  "navOrder": [
+    "COLOR-TYPE@TEST-CASE.COLOR-TYPE",
+    "COLOR-DATA@TEST-CASE.COLOR-DATA",
+    "MySeq@TEST-CASE.MySeq"
+  ],
+  "tables": [
+    {
+      "id": "COLOR-TYPE@TEST-CASE.COLOR-TYPE",
+      "name": "COLOR-TYPE",
+      "kind": "INTEGER",
+      "tasInfo": {
+        "modName": "TEST-CASE",
+        "tasName": "COLOR-TYPE"
+      },
+      "module": "TEST-CASE",
+      "usagePath": "TEST-CASE.COLOR-TYPE",
+      "usageSites": [
+        "TEST-CASE.COLOR-TYPE"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 1,
+      "maxLengthInBytes": 1,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(0 .. 255)",
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "COLOR-DATA@TEST-CASE.COLOR-DATA",
+      "name": "COLOR-DATA",
+      "kind": "CHOICE",
+      "tasInfo": {
+        "modName": "TEST-CASE",
+        "tasName": "COLOR-DATA"
+      },
+      "module": "TEST-CASE",
+      "usagePath": "TEST-CASE.COLOR-DATA",
+      "usageSites": [
+        "TEST-CASE.COLOR-DATA",
+        "TEST-CASE.MySeq.colorData"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 1,
+      "maxLengthInBytes": 19,
+      "comments": [
+        "Active alternative is determined by ACN using the fields: 'type2','type1'"
+      ],
+      "acnParameters": [
+        {
+          "name": "type1",
+          "type": {
+            "kind": "reference",
+            "id": "COLOR-TYPE@TEST-CASE.COLOR-TYPE"
+          }
+        },
+        {
+          "name": "type2",
+          "type": {
+            "kind": "reference",
+            "id": "COLOR-TYPE@TEST-CASE.COLOR-TYPE"
+          }
+        }
+      ],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "green",
+          "comments": [],
+          "sPresent": "type2=10 AND type1=30",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(1 .. 10)",
+          "minLengthInBits": 4,
+          "maxLengthInBits": 4,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "red",
+          "comments": [],
+          "sPresent": "type1=30 AND type2=20",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(1 .. 1000)",
+          "minLengthInBits": 10,
+          "maxLengthInBits": 10,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 3,
+          "fieldName": "Length",
+          "comments": [
+            "The number of characters"
+          ],
+          "sPresent": "type1=50 AND type2=20",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(1 .. 20)",
+          "minLengthInBits": 5,
+          "maxLengthInBits": 5,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 4,
+          "fieldName": "blue",
+          "comments": [
+            "Each character occupies 7 bits."
+          ],
+          "sPresent": "type1=50 AND type2=20",
+          "sType": {
+            "kind": "plain",
+            "value": "IA5String"
+          },
+          "sConstraint": "(1 .. 20)",
+          "minLengthInBits": 7,
+          "maxLengthInBits": 140,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 5,
+            "maxBits": 5,
+            "display": "5"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MySeq@TEST-CASE.MySeq",
+      "name": "MySeq",
+      "kind": "SEQUENCE",
+      "tasInfo": {
+        "modName": "TEST-CASE",
+        "tasName": "MySeq"
+      },
+      "module": "TEST-CASE",
+      "usagePath": "TEST-CASE.MySeq",
+      "usageSites": [
+        "TEST-CASE.MySeq"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 3,
+      "maxLengthInBytes": 21,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "activeColor1",
+          "comments": [
+            "reference determinant for TEST-CASE.MySeq.colorData.type1 "
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (COLOR-TYPE)"
+          },
+          "sConstraint": "(0 .. 255)",
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "activeColor2",
+          "comments": [
+            "reference determinant for TEST-CASE.MySeq.colorData.type2 "
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (COLOR-TYPE)"
+          },
+          "sConstraint": "(0 .. 255)",
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 8,
+            "maxBits": 8,
+            "display": "8"
+          }
+        },
+        {
+          "idxOffset": 3,
+          "fieldName": "colorData",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "reference",
+            "id": "COLOR-DATA@TEST-CASE.COLOR-DATA"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 4,
+          "maxLengthInBits": 145,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 16,
+            "maxBits": 16,
+            "display": "16"
+          }
+        }
+      ]
+    }
+  ]
+}

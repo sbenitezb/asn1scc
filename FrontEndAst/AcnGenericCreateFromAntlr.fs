@@ -269,6 +269,7 @@ let private createAcnProperty integerSizeInBytes (acnConstants : Map<string, Big
         result {
             match t.GetChild(0).Type with
             | acnParser.NULL_TERMINATED     -> return SIZE GP_NullTerminated
+            | acnParser.DEDUCED             -> return SIZE GP_Deduced
             | acnParser.INT
             | acnParser.UID                 ->
                 let! exp = CreateAcnIntegerConstant (t.GetChild 0)

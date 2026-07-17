@@ -1900,6 +1900,63 @@ is
       RealVal := Asn1Real (OctetArray8_to_Long_Float (tmp));
    end Acn_Dec_Real_IEEE754_64_little_endian;
 
+   function Acn_Real2ScaledUInt
+     (RealVal : Asn1Real; Low : Asn1Real; Scale : Asn1Real;
+      UIntMax : Asn1UInt) return Asn1UInt
+   is
+      pragma SPARK_Mode (Off);
+      --  floating-point to integer conversions with clamping are not
+      --  practically provable; the Post contract is enforced by the clamps
+      X : Asn1Real;
+   begin
+      X := (RealVal - Low) / Scale;
+      if not (X > 0.0) then
+         return 0;
+      end if;
+      X := Asn1Real'Rounding (X);   --  round half away from zero
+      if X >= Asn1Real (UIntMax) then
+         return UIntMax;
+      end if;
+      return Asn1UInt (X);
+   end Acn_Real2ScaledUInt;
+
+   function Acn_Real2ScaledSInt
+     (RealVal : Asn1Real; Low : Asn1Real; Scale : Asn1Real; IntMin : Asn1Int;
+      IntMax  : Asn1Int) return Asn1Int
+   is
+      pragma SPARK_Mode (Off);
+      --  the wrap-around modular arithmetic below is exact but not
+      --  practically provable; the Post contract is enforced by the clamps
+      --  performed in Acn_Real2ScaledUInt
+      --  modular arithmetic on Asn1UInt: exact for the full 64-bit range
+      Range_UInt : constant Asn1UInt := To_UInt (IntMax) - To_UInt (IntMin);
+      Delta_UInt : Asn1UInt;
+   begin
+      Delta_UInt := Acn_Real2ScaledUInt (RealVal, Low, Scale, Range_UInt);
+      return To_Int (To_UInt (IntMin) + Delta_UInt);
+   end Acn_Real2ScaledSInt;
+
+   function Acn_ScaledUInt2Real
+     (IntVal : Asn1UInt; Low : Asn1Real; Scale : Asn1Real) return Asn1Real
+   is
+      pragma SPARK_Mode (Off);
+      --  floating-point overflow checks on unconstrained operands are not
+      --  practically provable
+   begin
+      return Low + Asn1Real (IntVal) * Scale;
+   end Acn_ScaledUInt2Real;
+
+   function Acn_ScaledSInt2Real
+     (IntVal : Asn1Int; Low : Asn1Real; Scale : Asn1Real; IntMin : Asn1Int)
+      return Asn1Real
+   is
+      pragma SPARK_Mode (Off);
+      --  see Acn_ScaledUInt2Real
+      Delta_UInt : constant Asn1UInt := To_UInt (IntVal) - To_UInt (IntMin);
+   begin
+      return Low + Asn1Real (Delta_UInt) * Scale;
+   end Acn_ScaledSInt2Real;
+
    procedure Acn_Enc_Boolean_true_pattern
      (bs : in out Bitstream; BoolVal : Asn1Boolean; pattern : BitArray)
    is

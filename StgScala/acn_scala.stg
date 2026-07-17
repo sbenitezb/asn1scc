@@ -338,6 +338,25 @@ Real_64_little_endian_decode(p, sErrCode) ::= <<
 val <p> = codec.dec_Real_IEEE754_64_little_endian()
 >>
 
+// REAL encoded as scaled integer (issue #339): not supported for Scala.
+// The front end rejects the combination (see AcnCreateFromAntlr.mergeReal), so these
+// stubs exist only because AbstractMacros.fs is generated from the Scala backend.
+Real_ScaledInt_uint_encode(p, sTmpVar, sIntBody, sLow, sScale, sUintMax, sErrCode) ::= <<
+// TODO: Scala does not support the scaled-integer encoding of REAL types
+>>
+
+Real_ScaledInt_uint_decode(p, sTmpVar, sIntBody, sLow, sScale, sUintMax, sErrCode) ::= <<
+// TODO: Scala does not support the scaled-integer encoding of REAL types
+>>
+
+Real_ScaledInt_sint_encode(p, sTmpVar, sIntBody, sLow, sScale, sIntMin, sIntMax, sErrCode) ::= <<
+// TODO: Scala does not support the scaled-integer encoding of REAL types
+>>
+
+Real_ScaledInt_sint_decode(p, sTmpVar, sIntBody, sLow, sScale, sIntMin, sIntMax, sErrCode) ::= <<
+// TODO: Scala does not support the scaled-integer encoding of REAL types
+>>
+
 
 Boolean_encode(p, ptr, bEncValIsTrue, nSize, arruTrueValueAsByteArray, arruFalseValueAsByteArray, arrsBits, sErrCode) ::= <<
 locally {
@@ -1443,3 +1462,17 @@ acn_deferred_det_uper_offset_sub(sValue, sOffset) ::= "// TODO"
 acn_deferred_det_preblock_wrap(sPreBlock, sPatchCall) ::= "// TODO"
 acn_deferred_det_type_name() ::= "// TODO"
 acn_deferred_det_init_expr() ::= "// TODO"
+
+
+// 'size deduced' is not supported for Scala (empty stubs for interface parity)
+str_ascii_deduced_encode(p, sErrCode, nAsn1Max, nTrailingBits) ::= ""
+str_ascii_deduced_decode(p, sErrCode, nAsn1Max, nTrailingBits) ::= ""
+
+oct_deduced_encode(sTypedefName, p, sAcc, noSizeMin, nSizeMax, nTrailingBits, sErrCode) ::= ""
+oct_deduced_decode(sTypedefName, p, sAcc, noSizeMin, nSizeMax, nTrailingBits, sErrCode) ::= ""
+
+sqf_deduced_fix_elem_encode(sTypeDefName, p, sAcc, i, sInternalItem, noSizeMin, nSizeMax, nTrailingBits, nIntItemSize, sErrCode) ::= ""
+sqf_deduced_fix_elem_decode(sTypeDefName, p, sAcc, i, sInternalItem, noSizeMin, nSizeMax, nTrailingBits, nIntItemSize, sErrCode) ::= ""
+
+sqf_deduced_var_elem_encode(sTypeDefName, p, sAcc, i, sInternalItem, noSizeMin, nSizeMax, nTrailingBits, nIntItemMinSize, sErrCode) ::= ""
+sqf_deduced_var_elem_decode(sTypeDefName, p, sAcc, i, sInternalItem, noSizeMin, nSizeMax, nTrailingBits, nIntItemMinSize, sErrCode) ::= ""

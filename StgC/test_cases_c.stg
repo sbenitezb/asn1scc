@@ -82,6 +82,18 @@ ret = <sFuncName>(<sAmber>decodedPDU, &bitStrm, pErrCode);
 *pErrCode = (ret && *pErrCode ==0) ? 0 : 2;
 >>
 
+/* 'size deduced' PDU: the decoder derives element counts from the end of the
+   bitstream view, so it must be attached to exactly the encoded PDU length */
+Codec_Decode_exact_length(sModName, sFuncName, sTasName, sEnc, sAmber) ::= <<
+{
+	long encLenBytes = BitStream_GetLength(&bitStrm);
+	BitStream_AttachBuffer(&bitStrm, encBuff, (int)encLenBytes);
+}
+// Decode value
+ret = <sFuncName>(<sAmber>decodedPDU, &bitStrm, pErrCode);
+*pErrCode = (ret && *pErrCode ==0) ? 0 : 2;
+>>
+
 Codec_Decode_XER(sModName, sFuncName, sTasName, sEnc, sAmber) ::= <<
 ByteStream_AttachBuffer(&bitStrm, encBuff, <sTasName>_REQUIRED_BYTES_FOR_<sEnc>ENCODING);
 // Decode value

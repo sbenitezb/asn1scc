@@ -191,6 +191,7 @@ encodingProp
 sizeProp
 	:
 	  SIZE^ NULL_TERMINATED
+	| SIZE^ DEDUCED
 	| SIZE^ INT
 	| SIZE^ UID			//UID referes to a constant declared in the constant section
 	| SIZE^ longFld
@@ -376,6 +377,7 @@ asn1LID
 	| a=TWOSCOMPLEMENT	-> LID[$a]
 	| a=SIZE			-> LID[$a]
 	| a=NULL_TERMINATED -> LID[$a]
+	| a=DEDUCED			-> LID[$a]
 //	| a=ADJUST			-> LID[$a]
 	| a=ALIGNTONEXT		-> LID[$a]
 	| a=BYTE			-> LID[$a]
@@ -424,6 +426,7 @@ IEEE754_1985_64 	: 'IEEE754-1985-64';
 
 SIZE				: 'size';
 NULL_TERMINATED 	: 'null-terminated';
+DEDUCED				: 'deduced';
 TERMINATION_PATTERN	: 'termination-pattern';
 
 //ADJUST				: 'adjust';

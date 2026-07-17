@@ -1,0 +1,14 @@
+TEST-CASE DEFINITIONS AUTOMATIC TAGS::= BEGIN
+
+    Elem ::= SEQUENCE {
+        a INTEGER (0..255),
+        b INTEGER (0..65535) OPTIONAL
+    }
+
+    EList ::= SEQUENCE (SIZE(0..20)) OF Elem
+
+    lst1 EList ::= { { a 1, b 555 }, { a 2 }, { a 3, b 777 } }
+    lst2 EList ::= { }
+END
+
+--TCLS   Elem [] { a [encoding pos-int, size 8], b [] } EList [size deduced]

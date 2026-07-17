@@ -51,10 +51,12 @@ let createStringFunction (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnInsertedFiel
                         Acn_String_CharIndex_External_Field_Determinant pp errCode.errCodeName ( o.maxSize.acn) arrAsciiCodes (BigInteger o.uperCharSet.Length) extField td nBits codec
                     | true -> Acn_IA5String_CharIndex_External_Field_Determinant pp errCode.errCodeName o.maxSize.acn extField td nBits (nestingScope.acnOuterMaxSize - nestingScope.acnOffset) codec
                 Some(encDecStatement, [errCode], [], []), us
+            | Acn_Enc_String_Ascii_Deduced _ ->
+                Some (lm.acn.str_ascii_deduced pp errCode.errCodeName o.maxSize.acn nestingScope.deducedTrailingBits codec, [errCode], [], []), us
         match funcBodyContent with
         | None -> None, ns
         | Some (funcBodyContent,errCodes, localVars, auxiliaries) ->
-            let icd = AcnPrimitiveFactory.buildPrimitiveIcdAux (getASN1Name t) (getASN1Name t) None o.acnMinSizeInBits o.acnMaxSizeInBits t.unitsOfMeasure
+            let icd = AcnPrimitiveFactory.buildStringIcdAux t.acnAlignment o (getASN1Name t) (getASN1Name t) (constraintsToIcdStr (DAstAsn1.createStringFunction r t o)) t.unitsOfMeasure
             Some ({AcnFuncBodyResult.funcBody = funcBodyContent; errCodes = errCodes; localVariables = localVars; userDefinedFunctions=[]; bValIsUnReferenced= false; bBsIsUnReferenced=false; resultExpr=resultExpr; auxiliaries=auxiliaries; icdResult = Some icd} ), ns
     AcnPrimitiveFactory.createAsn1PrimitiveStateful r deps lm codec t typeDefinition isValidFunc [] us
         (fun us e acnArgs nestingScope p -> funcBody e acnArgs nestingScope p us)
@@ -166,8 +168,14 @@ let createAcnStringFunction (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnInsertedF
                 | Acn_Enc_String_uPER    _                                         ->
                     let x = uper_funcBody errCode nestingScope p
                     Some(x.funcBody, x.errCodes, x.localVariables, x.auxiliaries)
+                | Acn_Enc_String_Ascii_Deduced _ ->
+                    Some (lm.acn.str_ascii_deduced pp errCode.errCodeName t.str.maxSize.acn nestingScope.deducedTrailingBits codec, [], [], [])
             match funcBodyContent with
             | None -> None
             | Some (funcBodyContent,errCodes, lvs, auxiliaries) ->
-                let icd = AcnPrimitiveFactory.buildPrimitiveIcdAux "IA5String" "IA5String" None o.acnMinSizeInBits o.acnMaxSizeInBits None
+                // ACN-inserted children referencing an IA5String TAS keep that
+                // name on the ICD row ("IA5String (DeviceName)", roadmap A4).
+                let icd =
+                    AcnPrimitiveFactory.buildStringIcdAux t.acnAlignment o "IA5String" "IA5String" (constraintsToIcdStr (o.AllCons |> List.map DAstAsn1.foldStringCon)) None
+                    |> icdAuxAddNamedTypeSuffix (Some t.tasName.Value)
                 Some ({AcnFuncBodyResult.funcBody = funcBodyContent; errCodes = errCode::errCodes |> List.distinct ; localVariables = lvs; userDefinedFunctions=[]; bValIsUnReferenced= false; bBsIsUnReferenced=false; resultExpr=resultExpr; auxiliaries=auxiliaries; icdResult = Some icd}))

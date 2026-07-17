@@ -1,0 +1,19 @@
+TEST-CASE DEFINITIONS AUTOMATIC TAGS::= BEGIN
+
+    MyPDU ::= SEQUENCE {
+        hdr  INTEGER (0..255),
+        data OCTET STRING (SIZE(0..50))
+    }
+
+    MyStrPDU ::= SEQUENCE {
+        hdr  INTEGER (0..255),
+        name IA5String (SIZE(1..30))
+    }
+
+    pdu1 MyPDU ::= { hdr 1, data '0102030405'H }
+    spdu1 MyStrPDU ::= { hdr 2, name "hello" }
+END
+
+--TCLS   MyPDU [] { hdr [encoding pos-int, size 8], data [size deduced] }
+--TCLS   MyStrPDU [] { hdr [encoding pos-int, size 8], name [encoding ASCII, size deduced] }
+--TCLFC  MyStrPDU [] { hdr [encoding pos-int, size 8], name [size deduced] }  $$$ sample1.asn1:10:13: error: 'size deduced' on string types requires 'encoding ASCII'

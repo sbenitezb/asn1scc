@@ -354,6 +354,32 @@ ret = Acn_Dec_Real_IEEE754_64_little_endian(pBitStrm, <p>);
 <A(sErrCode)>
 >>
 
+/* REAL encoded as scaled integer (issue #339): the real value is mapped linearly onto
+   the integer range and the bitstream work is delegated to the integer encoding (sIntBody) */
+Real_ScaledInt_uint_encode(p, sTmpVar, sIntBody, sLow, sScale, sUintMax, sErrCode) ::= <<
+<sTmpVar> = Acn_Real2ScaledUInt(<p>, <sLow>, <sScale>, <sUintMax>);
+<sIntBody>
+>>
+
+Real_ScaledInt_uint_decode(p, sTmpVar, sIntBody, sLow, sScale, sUintMax, sErrCode) ::= <<
+<sIntBody>
+if (ret) {
+    <p> = Acn_ScaledUInt2Real(<sTmpVar>, <sLow>, <sScale>);
+}
+>>
+
+Real_ScaledInt_sint_encode(p, sTmpVar, sIntBody, sLow, sScale, sIntMin, sIntMax, sErrCode) ::= <<
+<sTmpVar> = Acn_Real2ScaledSInt(<p>, <sLow>, <sScale>, <sIntMin>, <sIntMax>);
+<sIntBody>
+>>
+
+Real_ScaledInt_sint_decode(p, sTmpVar, sIntBody, sLow, sScale, sIntMin, sIntMax, sErrCode) ::= <<
+<sIntBody>
+if (ret) {
+    <p> = Acn_ScaledSInt2Real(<sTmpVar>, <sLow>, <sScale>, <sIntMin>);
+}
+>>
+
 
 
 Boolean_encode(p, ptr, bEncValIsTrue, nSize, arruTrueValueAsByteArray, arruFalseValueAsByteArray, arrsBits, sErrCode) ::= <<
@@ -700,6 +726,94 @@ if (ret && (checkBitPatternPresentResult == 0)) {
 }
 
 >>
+
+/* ------------------------------------------------------------------------- */
+/* 'size deduced' (Docs/deduced-size-spec.md): the element count is not      */
+/* encoded; the decoder derives it from the remaining bits of the enclosing  */
+/* decoding region.  Region end = end of the bitstream view minus the        */
+/* compile-time trailing constant (nTrailingBits).                           */
+/* ------------------------------------------------------------------------- */
+
+str_ascii_deduced_encode(p, sErrCode, nAsn1Max, nTrailingBits) ::= "Acn_Enc_String_Ascii_External_Field_Determinant(pBitStrm, <nAsn1Max>, <p>);"
+str_ascii_deduced_decode(p, sErrCode, nAsn1Max, nTrailingBits) ::= <<
+{
+	long ded_avail_bits = (pBitStrm->count * 8L - <nTrailingBits>) - (pBitStrm->currentByte * 8L + pBitStrm->currentBit);
+	asn1SccSint ded_count = ded_avail_bits / 8;
+	ret = (ded_avail_bits \>= 0) && (ded_count \<= <nAsn1Max>);
+	<A(sErrCode)>
+	if (ret) {
+		ret = Acn_Dec_String_Ascii_External_Field_Determinant(pBitStrm, <nAsn1Max>, ded_count, <p>);
+		<A(sErrCode)>
+	}
+}
+>>
+
+oct_deduced_encode(sTypedefName, p, sAcc, noSizeMin, nSizeMax, nTrailingBits, sErrCode) ::= <<
+ret = BitStream_EncodeOctetString_no_length(pBitStrm, <p><sAcc>arr, <p><sAcc>nCount);
+>>
+
+oct_deduced_decode(sTypedefName, p, sAcc, noSizeMin, nSizeMax, nTrailingBits, sErrCode) ::= <<
+{
+	long ded_avail_bits = (pBitStrm->count * 8L - <nTrailingBits>) - (pBitStrm->currentByte * 8L + pBitStrm->currentBit);
+	asn1SccSint ded_count = ded_avail_bits / 8;
+	ret = (ded_avail_bits \>= 0) && <if(noSizeMin)>(<noSizeMin> \<= ded_count) && <endif>(ded_count \<= <nSizeMax>);
+	<A(sErrCode)>
+	if (ret) {
+		<p><sAcc>nCount = (int)ded_count;
+		ret = BitStream_DecodeOctetString_no_length(pBitStrm, <p><sAcc>arr, <p><sAcc>nCount);
+		<A(sErrCode)>
+	}
+}
+>>
+
+sqf_deduced_fix_elem_encode(sTypeDefName, p, sAcc, i, sInternalItem, noSizeMin, nSizeMax, nTrailingBits, nIntItemSize, sErrCode) ::= <<
+<loopFixedItem(i=i, sInternalItem=sInternalItem, fixedSize=[p, sAcc, "nCount"])>
+>>
+
+sqf_deduced_fix_elem_decode(sTypeDefName, p, sAcc, i, sInternalItem, noSizeMin, nSizeMax, nTrailingBits, nIntItemSize, sErrCode) ::= <<
+{
+	long ded_avail_bits = (pBitStrm->count * 8L - <nTrailingBits>) - (pBitStrm->currentByte * 8L + pBitStrm->currentBit);
+	asn1SccSint ded_count = ded_avail_bits / <nIntItemSize>;
+	ret = (ded_avail_bits \>= 0) && (ded_avail_bits - ded_count * <nIntItemSize> \< 8) && <if(noSizeMin)>(<noSizeMin> \<= ded_count) && <endif>(ded_count \<= <nSizeMax>);
+	<A(sErrCode)>
+	if (ret) {
+		<p><sAcc>nCount = (int)ded_count;
+		<loopFixedItem(i=i, sInternalItem=sInternalItem, fixedSize=[p, sAcc, "nCount"])>
+	}
+}
+>>
+
+sqf_deduced_var_elem_encode(sTypeDefName, p, sAcc, i, sInternalItem, noSizeMin, nSizeMax, nTrailingBits, nIntItemMinSize, sErrCode) ::= <<
+<loopFixedItem(i=i, sInternalItem=sInternalItem, fixedSize=[p, sAcc, "nCount"])>
+>>
+
+sqf_deduced_var_elem_decode(sTypeDefName, p, sAcc, i, sInternalItem, noSizeMin, nSizeMax, nTrailingBits, nIntItemMinSize, sErrCode) ::= <<
+{
+	long ded_budget_end = pBitStrm->count * 8L - <nTrailingBits>;
+	long ded_pos = pBitStrm->currentByte * 8L + pBitStrm->currentBit;
+	<i> = 0;
+	ret = (ded_pos \<= ded_budget_end);
+	<A(sErrCode)>
+	while(ret && <i> \< <nSizeMax> && ded_pos + <nIntItemMinSize> \<= ded_budget_end)
+	{
+		<sInternalItem>
+		ded_pos = pBitStrm->currentByte * 8L + pBitStrm->currentBit;
+		if (ret && ded_pos \> ded_budget_end) {
+			ret = FALSE;			/*COVERAGE_IGNORE*/
+			*pErrCode = <sErrCode>;	/*COVERAGE_IGNORE*/
+		}
+		<i>++;
+	}
+	if (ret) {
+		<p><sAcc>nCount = <i>;
+		if ((ded_budget_end - ded_pos \>= 8)<if(noSizeMin)> || (<i> \< <noSizeMin>)<endif>) {
+			ret = FALSE;			/*COVERAGE_IGNORE*/
+			*pErrCode = <sErrCode>;	/*COVERAGE_IGNORE*/
+		}
+	}
+}
+>>
+
 
 
 bit_string_external_field_encode(sTypeDefName, p, sErrCode, sAcc, noSizeMin, noSizeMax, sExtFld) ::= <<
@@ -1206,7 +1320,8 @@ octet_string_containing_ext_field_func_decode(p, sFuncName, sReqBytesForUperEnco
 	static byte arr[<sReqBytesForUperEncoding>];
     BitStream* pBitStrm_save = pBitStrm;
 	BitStream bitStrm;
-	BitStream_Init(&bitStrm, arr, sizeof(arr));
+	/*limit the temporary stream view to the actual region size ('size deduced' support)*/
+	BitStream_Init(&bitStrm, arr, (int)<sExtField>);
 	ret = (int)<sExtField> \<= <sReqBytesForUperEncoding>;
 	*pErrCode = ret ? 0 : <sErrCode>;
 	if (ret) {
@@ -1229,6 +1344,11 @@ octet_string_containing_deferred_func_encode(p, sFuncName, sDetParamName, sPatch
     AcnBitStreamPos acn_data_start = Acn_BitStream_GetPos(pBitStrm);
     ret = <sFuncName>(<p>, pBitStrm, pErrCode, FALSE);
     if (ret) {
+        /*pad the contained encoding to the next byte boundary: the region is
+          measured in whole octets and the decoder resumes at a byte boundary*/
+        if (pBitStrm->currentBit != 0) {
+            BitStream_AppendNBitZero(pBitStrm, 8 - pBitStrm->currentBit); /*COVERAGE_IGNORE*/
+        }
         AcnBitStreamPos acn_data_end = Acn_BitStream_GetPos(pBitStrm);
         asn1SccUint acn_nCount = Acn_BitStream_DistanceInBytes(acn_data_start, acn_data_end);
         ret = <sPatchFuncName>((asn1SccUint)acn_nCount, pBitStrm, <sDetParamName>, pErrCode);
@@ -1268,6 +1388,11 @@ octet_string_containing_deferred_embedded_func_encode(p, sFuncName, nMinSize, nM
     AcnBitStreamPos acn_data_start = Acn_BitStream_GetPos(pBitStrm);
     ret = <sFuncName>(<p>, pBitStrm, pErrCode, FALSE);
     if (ret) {
+        /*pad the contained encoding to the next byte boundary (see the
+          ext-field variant above)*/
+        if (pBitStrm->currentBit != 0) {
+            BitStream_AppendNBitZero(pBitStrm, 8 - pBitStrm->currentBit); /*COVERAGE_IGNORE*/
+        }
         AcnBitStreamPos acn_data_end = Acn_BitStream_GetPos(pBitStrm);
         asn1SccUint acn_nCount = Acn_BitStream_DistanceInBytes(acn_data_start, acn_data_end);
         Acn_BitStream_SetPos(pBitStrm, acn_len_pos);
@@ -1300,6 +1425,11 @@ octet_string_containing_deferred_wrapper_encode(sBody, sDetParamName, sPatchFunc
     AcnBitStreamPos acn_data_start = Acn_BitStream_GetPos(pBitStrm);
     <sBody>
     if (ret) {
+        /*pad the contained encoding to the next byte boundary (see the
+          ext-field variant above)*/
+        if (pBitStrm->currentBit != 0) {
+            BitStream_AppendNBitZero(pBitStrm, 8 - pBitStrm->currentBit); /*COVERAGE_IGNORE*/
+        }
         AcnBitStreamPos acn_data_end = Acn_BitStream_GetPos(pBitStrm);
         asn1SccUint acn_nCount = Acn_BitStream_DistanceInBytes(acn_data_start, acn_data_end);
         ret = <sPatchFuncName>((asn1SccUint)acn_nCount, pBitStrm, <sDetParamName>, pErrCode);
@@ -1477,18 +1607,20 @@ octet_string_containing_func_encode(p, sFuncName, sReqBytesForAcnEncoding, nBits
 octet_string_containing_func_decode(p, sFuncName, sReqBytesForAcnEncoding, nBits, nMinSize, nMaxSize, bFixedSize) ::= <<
 /*open new scope to declare some variables*/
 {
-	/*decode to a temporary bitstream*/
+	/*decode to a temporary bitstream whose view is limited to the actual
+	  region size ('size deduced' support)*/
 	static byte arr[<sReqBytesForAcnEncoding>];
 	BitStream bitStrm;
-	BitStream_Init(&bitStrm, arr, sizeof(arr));
 
 	<if(bFixedSize)>
+	BitStream_Init(&bitStrm, arr, <nMinSize>);
 	ret = BitStream_DecodeOctetString_no_length(pBitStrm, arr, <nMinSize>);
 
 	<else>
 	asn1SccSint nCount;
 	ret = BitStream_DecodeConstraintWholeNumber(pBitStrm, &nCount, <nMinSize>, <nMaxSize>);
 	if (ret) {
+		BitStream_Init(&bitStrm, arr, (int)nCount);
 		ret = BitStream_DecodeOctetString_no_length(pBitStrm, arr, (int)nCount);
 	}
 

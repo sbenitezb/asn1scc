@@ -1149,6 +1149,45 @@ flag Acn_Dec_Real_IEEE754_64_little_endian(BitStream* pBitStrm, asn1Real* pRealV
 }
 
 
+/*
+REAL encoded as scaled integer.
+The REAL range [a, b] is mapped linearly onto the integer range [intMin, intMax]:
+    encoded = round((realValue - low) / scale) + intMin        (round half away from zero)
+    real    = low + (encoded - intMin) * scale
+where low = a and scale = (b - a) / (intMax - intMin) are computed by the compiler.
+Rounding is implemented without math.h so that the ACN unit stays libm-free.
+Out-of-range and NaN inputs are clamped to the integer range (constraint validity
+is checked separately by the generated IsConstraintValid functions).
+*/
+
+asn1SccUint Acn_Real2ScaledUInt(asn1Real realValue, asn1Real low, asn1Real scale, asn1SccUint uintMax)
+{
+	asn1Real x = (realValue - low) / scale;
+	if (!(x > 0.0))	/* covers x <= 0 and NaN */
+		return 0;
+	x += 0.5;	/* trunc(x + 0.5) == round half away from zero, for x > 0 */
+	if (x >= (asn1Real)uintMax)
+		return uintMax;
+	return (asn1SccUint)x;
+}
+
+asn1SccSint Acn_Real2ScaledSInt(asn1Real realValue, asn1Real low, asn1Real scale, asn1SccSint intMin, asn1SccSint intMax)
+{
+	asn1SccUint range = int2uint(intMax) - int2uint(intMin);	/* modular arithmetic: exact */
+	asn1SccUint delta = Acn_Real2ScaledUInt(realValue, low, scale, range);
+	return uint2int(int2uint(intMin) + delta, WORD_SIZE);
+}
+
+asn1Real Acn_ScaledUInt2Real(asn1SccUint intVal, asn1Real low, asn1Real scale)
+{
+	return low + (asn1Real)intVal * scale;
+}
+
+asn1Real Acn_ScaledSInt2Real(asn1SccSint intVal, asn1Real low, asn1Real scale, asn1SccSint intMin)
+{
+	asn1SccUint delta = int2uint(intVal) - int2uint(intMin);	/* modular arithmetic: exact */
+	return low + (asn1Real)delta * scale;
+}
 
 
 /* String functions*/

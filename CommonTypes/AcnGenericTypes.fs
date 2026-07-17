@@ -336,16 +336,20 @@ type IntegerAcnProperties = {
 type AcnRealEncoding =
     | IEEE754_32
     | IEEE754_64
+    | Real_PosInt               //REAL encoded as scaled unsigned integer (issue #339)
+    | Real_TwosComplement       //REAL encoded as scaled two's-complement integer (issue #339)
 
 type RealAcnProperties = {
     encodingProp    : AcnRealEncoding       option
     endiannessProp  : AcnEndianness         option
+    sizeProp        : AcnIntSizeProperty    option      //valid only with Real_PosInt/Real_TwosComplement encodings
 }
 
 // String acn properties
 type AcnStringSizeProperty =
     | StrExternalField   of RelativePath
     | StrNullTerminated  of byte list     //termination character when encoding is ASCII
+    | StrDeduced                          //size deduced from the enclosing decoding region (no length determinant)
 
 type AcnStringEncoding =
     | StrAscii
@@ -358,6 +362,7 @@ type StringAcnProperties = {
 type AcnSizeableSizeProperty =
     | SzExternalField   of RelativePath
     | SzNullTerminated  of StringLoc     //termination pattern
+    | SzDeduced                          //size deduced from the enclosing decoding region (no length determinant)
 
 
 type SizeableAcnProperties = {
@@ -468,6 +473,7 @@ type GenAcnEncodingProp =
 type GenSizeProperty =
     | GP_Fixed                 of IntLoc
     | GP_NullTerminated
+    | GP_Deduced
     | GP_SizeDeterminant       of RelativePath
 
 

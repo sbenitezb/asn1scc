@@ -263,6 +263,12 @@ flag Acn_Dec_Real_IEEE754_64_little_endian(BitStream* pBitStrm, asn1Real* pRealV
 flag Acn_Dec_Real_IEEE754_32_big_endian_fp32(BitStream* pBitStrm, float* pRealValue);
 flag Acn_Dec_Real_IEEE754_32_little_endian_fp32(BitStream* pBitStrm, float* pRealValue);
 
+/*Real encoded as scaled integer (linear mapping between the REAL range and the integer range)*/
+asn1SccUint Acn_Real2ScaledUInt(asn1Real realValue, asn1Real low, asn1Real scale, asn1SccUint uintMax);
+asn1SccSint Acn_Real2ScaledSInt(asn1Real realValue, asn1Real low, asn1Real scale, asn1SccSint intMin, asn1SccSint intMax);
+asn1Real Acn_ScaledUInt2Real(asn1SccUint intVal, asn1Real low, asn1Real scale);
+asn1Real Acn_ScaledSInt2Real(asn1SccSint intVal, asn1Real low, asn1Real scale, asn1SccSint intMin);
+
 /*String functions*/
 void Acn_Enc_String_Ascii_FixSize                       (BitStream* pBitStrm, asn1SccSint max, const char* strVal);
 void Acn_Enc_String_Ascii_Null_Terminated                (BitStream* pBitStrm, asn1SccSint max, char null_character, const char* strVal);

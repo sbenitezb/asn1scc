@@ -278,9 +278,11 @@ let exportAcnIntEncoding (a:AcnIntEncoding option) =
 
 let exportAcnRealEncoding (a:AcnRealEncoding option) =
     match a with
-    | Some IEEE754_32       -> [XAttribute(xname "encoding", "IEEE754-1985-32" )]
-    | Some IEEE754_64       -> [XAttribute(xname "encoding", "IEEE754-1985-64" )]
-    | None                  -> []
+    | Some IEEE754_32           -> [XAttribute(xname "encoding", "IEEE754-1985-32" )]
+    | Some IEEE754_64           -> [XAttribute(xname "encoding", "IEEE754-1985-64" )]
+    | Some Real_PosInt          -> [XAttribute(xname "encoding", "pos-int" )]
+    | Some Real_TwosComplement  -> [XAttribute(xname "encoding", "twos-complement" )]
+    | None                      -> []
 
 let exportAcnStringEncoding (a:AcnStringEncoding option) =
     match a with
@@ -290,12 +292,14 @@ let exportAcnStringSizeProperty (a:AcnStringSizeProperty option) =
     match a with
     | Some (StrExternalField  (RelativePath path)) -> [XAttribute(xname "size", (path |> Seq.StrJoin ".") )]
     | Some (StrNullTerminated  b)                  -> [XAttribute(xname "size", "null-terminated" ); XAttribute(xname "termination-pattern", b )]
+    | Some StrDeduced                              -> [XAttribute(xname "size", "deduced" )]
     | None                                         -> []
 
 let exportSizeableSizeProp (a:AcnSizeableSizeProperty option) =
     match a with
     | Some (SzExternalField (RelativePath path)) -> [XAttribute(xname "size", (path |> Seq.StrJoin ".") )]
     | Some (SzNullTerminated bitPattern)         -> [XAttribute(xname "size", ("null-terminated") ); XAttribute(xname "termination-pattern", (bitPattern.Value) )]
+    | Some SzDeduced                             -> [XAttribute(xname "size", "deduced" )]
     | None                     -> []
 
 let exportChoiceDeterminant (a:RelativePath option) =
@@ -359,6 +363,7 @@ let private exportType (t:Asn1Type) =
                         (XAttribute(xname "uperMinSizeInBits", ti.uperMinSizeInBits )),
                         (exportAcnEndianness ti.acnProperties.endiannessProp),
                         (exportAcnRealEncoding ti.acnProperties.encodingProp),
+                        (exportAcnIntSizeProperty ti.acnProperties.sizeProp),
                         XElement(xname constraintsTag, ti.cons |> List.map(printRangeConstraint printRealVal)),
                         XElement(xname withCompConstraintsTag, ti.withcons |> List.map(printRangeConstraint printRealVal ))
                         ), us )

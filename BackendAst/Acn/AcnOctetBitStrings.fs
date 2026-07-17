@@ -81,13 +81,16 @@ let createOctetStringFunction (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnInserte
                     | Decode, true    -> [IntegerLocalVariable ("checkBitPatternPresentResult", Some (lm.lg.intValueToString 0I (ASN1SCC_Int8 (-128I, 127I))))]
                     | _            -> []
                 Some(fncBody, [errCode],lv::lv2)
+            | SZ_EC_Deduced ->
+                let noSizeMin = if o.minSize.acn = 0I then None else Some o.minSize.acn
+                let fncBody = lm.acn.oct_deduced td pp access noSizeMin o.maxSize.acn nestingScope.deducedTrailingBits errCode.errCodeName codec
+                Some(fncBody, [errCode], [])
 
         match funcBodyContent with
         | None -> None
         | Some (funcBodyContent,errCodes, localVariables) ->
-            let icdFnc fieldName sPresent comments  =
-                [{IcdRow.fieldName = fieldName; comments = comments; sPresent=sPresent;sType=(IcdPlainType (getASN1Name t)); sConstraint=None; minLengthInBits = o.acnMinSizeInBits ;maxLengthInBits=o.acnMaxSizeInBits;sUnits=t.unitsOfMeasure; rowType = IcdRowType.FieldRow; idxOffset = None}], []
-            let icd = {IcdArgAux.canBeEmbedded = true; baseAsn1Kind = (getASN1Name t); rowsFunc = icdFnc; commentsForTas=[]; scope="type"; name= None}
+            let sAsn1Constraints = constraintsToIcdStr (DAstAsn1.createOctetStringFunction r t o)
+            let icd = AcnPrimitiveFactory.buildOctetOrBitStringIcdAux t.acnAlignment o.acnEncodingClass "bytes" o.maxSize.acn (getASN1Name t) (getASN1Name t) sAsn1Constraints o.acnMinSizeInBits o.acnMaxSizeInBits t.unitsOfMeasure
 
             Some ({AcnFuncBodyResult.funcBody = funcBodyContent; errCodes = errCodes; localVariables = localVariables; userDefinedFunctions=[]; bValIsUnReferenced= false; bBsIsUnReferenced=false; resultExpr=resultExpr; auxiliaries=[]; icdResult = Some icd})
     let soSparkAnnotations = Some (sparkAnnotations lm td codec)
@@ -138,6 +141,9 @@ let createBitStringFunction (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnInsertedF
                 let fncBody = bitString_FixSize td pp access o.minSize.acn errCode.errCodeName codec
                 Some(fncBody, [errCode],[])
 
+            | SZ_EC_Deduced ->
+                raise(BugErrorException "'size deduced' is not applicable to BIT STRING (should have been rejected by the front-end)")
+
             | SZ_EC_LENGTH_EMBEDDED nSizeInBits ->
                 let fncBody =
                     bitString_VarSize td pp access o.minSize.acn o.maxSize.acn errCode.errCodeName nSizeInBits codec
@@ -149,9 +155,8 @@ let createBitStringFunction (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnInsertedF
         match funcBodyContent with
         | None -> None
         | Some (funcBodyContent,errCodes, localVariables) ->
-            let icdFnc fieldName sPresent comments  =
-                [{IcdRow.fieldName = fieldName; comments = comments; sPresent=sPresent;sType=(IcdPlainType (getASN1Name t)); sConstraint=None; minLengthInBits = o.acnMinSizeInBits ;maxLengthInBits=o.acnMaxSizeInBits;sUnits=t.unitsOfMeasure; rowType = IcdRowType.FieldRow; idxOffset = None}], []
-            let icd = {IcdArgAux.canBeEmbedded = true; baseAsn1Kind = (getASN1Name t); rowsFunc = icdFnc; commentsForTas=[]; scope="type"; name= None}
+            let sAsn1Constraints = constraintsToIcdStr (DAstAsn1.createBitStringFunction r t o)
+            let icd = AcnPrimitiveFactory.buildOctetOrBitStringIcdAux t.acnAlignment o.acnEncodingClass "bits" o.maxSize.acn (getASN1Name t) (getASN1Name t) sAsn1Constraints o.acnMinSizeInBits o.acnMaxSizeInBits t.unitsOfMeasure
 
             Some ({AcnFuncBodyResult.funcBody = funcBodyContent; errCodes = errCodes; localVariables = localVariables; userDefinedFunctions=[]; bValIsUnReferenced= false; bBsIsUnReferenced=false; resultExpr=resultExpr; auxiliaries=[]; icdResult = Some icd})
 

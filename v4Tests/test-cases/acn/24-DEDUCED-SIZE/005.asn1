@@ -1,0 +1,38 @@
+TEST-CASE DEFINITIONS AUTOMATIC TAGS::= BEGIN
+
+    MyInt ::= INTEGER (0..16383)
+
+    ListA ::= SEQUENCE (SIZE(0..100)) OF MyInt
+    ListB ::= SEQUENCE (SIZE(0..100)) OF MyInt
+    ListC ::= SEQUENCE (SIZE(0..100)) OF MyInt
+    ListD ::= SEQUENCE (SIZE(0..100)) OF MyInt
+    ListE ::= SEQUENCE (SIZE(0..100)) OF MyInt
+
+    BadTrailer ::= SEQUENCE {
+        items   ListA,
+        trailer OCTET STRING (SIZE(0..4))
+    }
+
+    BadOptional ::= SEQUENCE {
+        items ListB,
+        note  BOOLEAN OPTIONAL
+    }
+
+    BadChoice ::= CHOICE {
+        a INTEGER (0..200),
+        b ListC
+    }
+
+    BadSqOf ::= SEQUENCE (SIZE(0..5)) OF ListD
+
+    BadOptDeduced ::= SEQUENCE {
+        items ListE OPTIONAL,
+        crc   INTEGER (0..255)
+    }
+END
+
+--TCLFC  MyInt [encoding pos-int, size 16] ListA [size deduced]  $$$ sample1.asn1:13:8: error: component 'trailer' follows the 'size deduced' component 'items' and must be a non-optional, fixed-size component: its ACN encoding size is variable (3..35 bits)
+--TCLFC  MyInt [encoding pos-int, size 16] ListB [size deduced]  $$$ sample1.asn1:18:8: error: component 'note' follows the 'size deduced' component 'items' and must be a non-optional, fixed-size component: it is OPTIONAL
+--TCLFC  MyInt [encoding pos-int, size 16] ListC [size deduced]  $$$ sample1.asn1:23:8: error: a 'size deduced' type may only be nested inside SEQUENCEs up to the enclosing CONTAINING container or top-level PDU; alternative 'b' of this CHOICE consumes the rest of the decoding region
+--TCLFC  MyInt [encoding pos-int, size 16] ListD [size deduced]  $$$ sample1.asn1:26:16: error: a 'size deduced' type may only be nested inside SEQUENCEs up to the enclosing CONTAINING container or top-level PDU; here it is used as the element of a SEQUENCE OF
+--TCLFC  MyInt [encoding pos-int, size 16] ListE [size deduced]  $$$ sample1.asn1:29:8: error: the 'size deduced' component 'items' may not be OPTIONAL

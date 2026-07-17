@@ -1,0 +1,75 @@
+{
+  "navOrder": [
+    "MyPDU@TEST-CASE.MyPDU"
+  ],
+  "tables": [
+    {
+      "id": "MyPDU@TEST-CASE.MyPDU",
+      "name": "MyPDU",
+      "kind": "SEQUENCE",
+      "tasInfo": {
+        "modName": "TEST-CASE",
+        "tasName": "MyPDU"
+      },
+      "module": "TEST-CASE",
+      "usagePath": "TEST-CASE.MyPDU",
+      "usageSites": [
+        "TEST-CASE.MyPDU"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 1,
+      "maxLengthInBytes": 2,
+      "comments": [
+        "/*\nTest case demonstrating the present when expression functionality (see also the 001.acn file)\nBusiness requirement: field enm is present when int1 is less than 10 and even number or when it is within range 10..14.\n\nThe above requirement must be expressed as ASN.1 constraint. Usually, this is done with the usage of WITH COMPONENTS constraints.\n\n\n*/",
+        "/*\nthe present-when attribyte can be followed by a boolean expression which can contain one or more non optional ASN.1 fields (not ACN inserted fields).\nThe ACN expression can use int and real constants, non optional ASN.1 fields as well as the following operattos\n + - * / % <= < >= > and or\n \n*/"
+      ],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "int1",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(1 .. 20)",
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "enm",
+          "comments": [
+            "Possible values:<br/>\n<ul class=\"enumeration\">\n<li><font class=\"enumeration_name\">one</font> (1)</li>\n<li><font class=\"enumeration_name\">two</font> (2)</li>\n<li><font class=\"enumeration_name\">three</font> (3)</li>\n<li><font class=\"enumeration_name\">four</font> (4)</li>\n<li><font class=\"enumeration_name\">thousand</font> (1000)</li>\n</ul>"
+          ],
+          "sPresent": "when (int1 < 10 and int1 % 2 == 0) or (int1 >= 10 and int1 <= 14)",
+          "sType": {
+            "kind": "plain",
+            "value": "ENUMERATED"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 3,
+          "maxLengthInBits": 3,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 8,
+            "maxBits": 8,
+            "display": "8"
+          }
+        }
+      ]
+    }
+  ]
+}

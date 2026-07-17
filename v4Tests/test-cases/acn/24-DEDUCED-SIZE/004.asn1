@@ -1,0 +1,30 @@
+-- NOCOVERAGE (Ada): gnatcov/gcov reports the 'declare' line of blocks that create a Bitstream object as uncovered (same pre-existing artifact as 23-CONTAINING/003 and /009, which hit it through the uPER CONTAINING temp streams)
+TEST-CASE DEFINITIONS AUTOMATIC TAGS::= BEGIN
+
+    MyInt12 ::= INTEGER (0..4000)
+
+    -- odd min/max element counts x 12 bits: the contained region is not a
+    -- whole number of bytes, exercising the byte-padding of the region.
+    -- SIZE(1..100) keeps the embedded length determinant of the containers
+    -- at exactly 8 bits: under --acn-v2 the contained region must start on
+    -- a byte boundary (pre-existing acn-v2 CONTAINING limitation with
+    -- sub-byte embedded length determinants, see q/issues.md)
+    TLVList ::= SEQUENCE (SIZE(1..100)) OF MyInt12
+
+    MyPDU ::= SEQUENCE {
+        seqNr   INTEGER (0..255),
+        payload OCTET STRING (CONTAINING TLVList)
+    }
+
+    MyPDU2 ::= SEQUENCE {
+        seqNr   INTEGER (0..255),
+        payload OCTET STRING (CONTAINING TLVList)
+    }
+
+    MyMsg ::= CHOICE {
+        a INTEGER (0..200),
+        b OCTET STRING (CONTAINING TLVList)
+    }
+END
+
+--TCLS   MyInt12 [encoding pos-int, size 12] TLVList [size deduced] MyPDU [] { seqNr [encoding pos-int, size 8], len INTEGER [encoding pos-int, size 16], payload [size len] } MyPDU2 [] { seqNr [encoding pos-int, size 8], payload [] } MyMsg [] { a [], b [align-to-next byte] }

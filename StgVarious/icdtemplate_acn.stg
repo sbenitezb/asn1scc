@@ -42,7 +42,7 @@ RelativeOid()       ::= "RELATIVE-OID"
 
 EmitRowWith3Dots() ::= <<
 <tr class="CommentRow">
-<td class="threeDots" colspan="9"> <p>. . .</p> </td>
+<td class="threeDots" colspan="10"> <p>. . .</p> </td>
 </tr>
 >>
 
@@ -74,6 +74,16 @@ $arrsTases;separator="\n"$
 
 EmitNavLink(sTitle, sTarget) ::= <<
 <a href="#ICD_$sTarget$">$sTitle$</a>
+>>
+
+/* Nav-pane module header: the target is the module anchor emitted by EmitModule (roadmap B4) */
+EmitNavModule(sModName) ::= <<
+<a href="#ICD_$sModName$" style="font-weight:bold; background-color:#e4e4e4; margin-top:8px">$sModName$</a>
+>>
+
+/* Nav-pane entry of a -icdPdus root: listed first within its module, visually distinct (roadmap B4) */
+EmitNavLinkRootPdu(sTitle, sTarget) ::= <<
+<a href="#ICD_$sTarget$"><b>&#9656; $sTitle$</b></a>
 >>
 
 
@@ -144,7 +154,7 @@ EmitSequenceOrChoice(bIsAnonymousType, sTasName, sTasNameC, bHasAcnDef, sAsn1Kin
 <tbody>
 
 <tr class="typeRow">
-<td colspan="7">
+<td colspan="8">
 $sTasName$ <font size="-1">($if(bIsAnonymousType)$<i>anonymous </i>$endif$$sAsn1Kinf$)</font>
 <font size="-2"><a href="#ASN1_$sTasNameC$" class="fileLink">ASN.1</a>$if(bHasAcnDef)$  <a href="#ACN_$sTasNameC$" class="fileLink">ACN</a>$endif$</font>
 </td>
@@ -160,7 +170,7 @@ $sTasName$ <font size="-1">($if(bIsAnonymousType)$<i>anonymous </i>$endif$$sAsn1
 
 $if(sCommentLine)$
 <tr class="CommentRow">
-<td class="comment2" colspan="9">$sCommentLine$</td>
+<td class="comment2" colspan="10">$sCommentLine$</td>
 </tr>
 $endif$
 
@@ -182,6 +192,7 @@ $endif$
 <td class="hrOptional">Present</td>
 <td class="hrType">Type</td>
 <td class="hrConstraint">Constraint</td>
+<td class="hrOffset">Offset (bits)</td>
 <td class="hrMin">Min Bits</td>
 <td class="hrMax">Max Bits</td>
 <td class="hrMax">Unit</td>
@@ -194,7 +205,10 @@ $arrsChildren;separator="\n"$
 >>
 
 
-EmitSeqOrChoiceRow(sCssClass, nIndex, sName, sComment, sPresentWhen, sType, sConstraint, sMin, sMax, noAlignToNextSize, soUnit) ::= <<
+/* soStartOffset (roadmap D1, append-only): the cumulative bit offset at which the
+   field starts, measured from the start of the type - an exact number, a
+   "min..max" range, or "variable". Empty when not supplied (old pipeline). */
+EmitSeqOrChoiceRow(sCssClass, nIndex, sName, sComment, sPresentWhen, sType, sConstraint, sMin, sMax, noAlignToNextSize, soUnit, soStartOffset, soIndexOverride) ::= <<
 $if(noAlignToNextSize)$
 <tr class="$sCssClass$">
 <td class="no"></td>
@@ -203,6 +217,7 @@ $if(noAlignToNextSize)$
 <td class="optional"></td>
 <td class="type">padding bits</td>
 <td class="constraint"></td>
+<td class="offset"></td>
 <td class="min">0</td>
 <td class="max">$noAlignToNextSize$</td>
 <td class="max">$soUnit$</td>
@@ -210,12 +225,13 @@ $if(noAlignToNextSize)$
 
 $endif$
 <tr class="$sCssClass$">
-<td class="no">$nIndex$</td>
+<td class="no">$if(soIndexOverride)$$soIndexOverride$$else$$nIndex$$endif$</td>
 <td class="field", style="white-space: nowrap;">$sName$</td>
 <td class="comment">$sComment$</td>
 <td class="optional">$sPresentWhen$</td>
 <td class="type">$sType$</td>
 <td class="constraint">$sConstraint$</td>
+<td class="offset">$soStartOffset$</td>
 <td class="min">$sMin$</td>
 <td class="max">$sMax$</td>
 <td class="max">$soUnit$</td>
@@ -472,6 +488,15 @@ table td:first-child
     width: 1%;
 }
 
+.hrOffset
+{
+    text-align: left;
+    color: white;
+    font-size: 10pt;
+    white-space: nowrap;
+    width: 1%;
+}
+
 .hrMin
 {
     text-align: left;
@@ -561,6 +586,14 @@ table td:first-child
 .optional
 {
     text-align: left;
+    color: black;
+    font-size: 9pt;
+    white-space: nowrap;
+}
+
+.offset
+{
+    text-align: right;
     color: black;
     font-size: 9pt;
     white-space: nowrap;

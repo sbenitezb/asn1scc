@@ -1,0 +1,12 @@
+TEST-CASE DEFINITIONS AUTOMATIC TAGS::= BEGIN
+
+    MyBits  ::= BIT STRING (SIZE(0..64))
+    BoolArr ::= SEQUENCE (SIZE(0..8)) OF BOOLEAN
+    FixOct  ::= OCTET STRING (SIZE(10))
+    MyIntT  ::= INTEGER (0..255)
+END
+
+--TCLFC  MyBits [size deduced]   $$$ sample1.asn1:3:16: error: 'size deduced' is not applicable to BIT STRING (its element occupies a single bit, which is below the byte-padding resolution)
+--TCLFC  BoolArr [size deduced]  $$$ sample1.asn1:4:16: error: 'size deduced' requires the SEQUENCE OF element to occupy at least 8 bits (its minimum ACN size is 1 bits)
+--TCLFC  FixOct [size deduced]   $$$ sample1.acn:4:8: error: 'size deduced' is pointless for a fixed-size type; remove the size property
+--TCLFC  MyIntT [size deduced]   $$$ sample1.acn:4:8: error: 'size deduced' is not applicable to this type

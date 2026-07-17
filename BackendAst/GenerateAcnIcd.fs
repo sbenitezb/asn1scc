@@ -66,6 +66,9 @@ let PrintAcnAsHTML stgFileName (r:AstRoot)  =
 
 let PrintAcnAsHTML2 stgFileName (r:AstRoot)  (icdHashesToPrint:string list) =
     let icdHashesToPrintSet = icdHashesToPrint |> Set.ofList
+    // TAS name -> hashes of the selected tables of that TAS, deterministic
+    // order (more than one element only when the same TAS name exists in
+    // several modules).
     let fileTypeAssignments =
         r.icdHashes.Values |>
         Seq.collect id |>
@@ -73,17 +76,76 @@ let PrintAcnAsHTML2 stgFileName (r:AstRoot)  (icdHashesToPrint:string list) =
             match z.tasInfo with
             | Some ts when icdHashesToPrintSet.Contains z.hash  -> Some (ts.tasName, z.hash)
             | _ -> None) |>
+        Seq.distinct |>
+        Seq.groupBy fst |>
+        Seq.map(fun (tasName, pairs) -> (tasName, pairs |> Seq.map snd |> Seq.sort |> Seq.toList)) |>
         Map.ofSeq
 
-    let colorize (t: IToken) =
+    // The "ACN" link of a table header targets #ACN_<hash>; that anchor must
+    // exist exactly once in the document (roadmap B5 / R6: the old code
+    // re-emitted it at every occurrence of the name - duplicate anchors,
+    // invalid HTML).  The anchor is placed on the token that defines the ACN
+    // encoding spec of the TAS: a module-level occurrence (brace depth 0)
+    // directly followed by '[', '{' or '<'.  A TAS whose ACN properties only
+    // appear at a usage site (e.g. the type of an ACN-inserted child) falls
+    // back to its first occurrence.  Every other occurrence renders as a
+    // plain link to the ASN.1 definition.
+    let anchorTokenOfName : Map<string, string*int> =
+        let significant (tok: IToken) =
+            match tok.Type with
+            | t when t = acnLexer.WS || t = acnLexer.COMMENT || t = acnLexer.COMMENT2 -> false
+            | _ -> true
+        let defSites   = System.Collections.Generic.Dictionary<string, string*int>()
+        let firstSites = System.Collections.Generic.Dictionary<string, string*int>()
+        for pr in r.acnParseResults do
+            let mutable braceDepth = 0
+            pr.tokens |> Array.iteri(fun idx tok ->
+                match tok.Text with
+                | "{" -> braceDepth <- braceDepth + 1
+                | "}" -> braceDepth <- braceDepth - 1
+                | _   ->
+                    match tok.Type = acnLexer.UID && fileTypeAssignments.ContainsKey tok.Text with
+                    | false -> ()
+                    | true  ->
+                        match firstSites.ContainsKey tok.Text with
+                        | false -> firstSites.[tok.Text] <- (pr.fileName, idx)
+                        | true  -> ()
+                        let nextSignificant = pr.tokens.[idx+1 ..] |> Array.tryFind significant
+                        let isDefSite =
+                            match braceDepth, nextSignificant with
+                            | 0, Some nt -> nt.Text = "[" || nt.Text = "{" || nt.Text = "<"
+                            | _, _       -> false
+                        match isDefSite && not (defSites.ContainsKey tok.Text) with
+                        | true  -> defSites.[tok.Text] <- (pr.fileName, idx)
+                        | false -> ())
+        fileTypeAssignments |>
+        Map.toList |>
+        List.choose(fun (name, _) ->
+            match defSites.TryGetValue name with
+            | true, site -> Some (name, site)
+            | false, _ ->
+                match firstSites.TryGetValue name with
+                | true, site -> Some (name, site)
+                | false, _   -> None) |>
+        Map.ofList
+
+    let colorize (fName: string) (idx: int) (t: IToken) =
             let lt = icd_acn.LeftDiple stgFileName ()
             let gt = icd_acn.RightDiple stgFileName ()
             let isAcnKeyword = acnTokens.Contains t.Text
             let safeText = t.Text.Replace("<",lt).Replace(">",gt)
             let uid =
                 match fileTypeAssignments.TryFind t.Text with
-                |Some hash (*when icdHashesToPrintSet.Contains hash*) -> icd_acn.TasName stgFileName safeText hash
-                |None -> safeText
+                | Some (mainHash::extraHashes) ->
+                    match anchorTokenOfName.TryFind t.Text with
+                    | Some site when site = (fName, idx) ->
+                        // definition site: one ACN_<hash> anchor per selected
+                        // table of this TAS (the extra ones - same TAS name in
+                        // another module - as invisible empty-text anchors)
+                        let extraAnchors = extraHashes |> List.map(fun h -> icd_acn.TasName stgFileName "" h)
+                        (extraAnchors @ [icd_acn.TasName stgFileName safeText mainHash]) |> String.concat ""
+                    | _ -> icd_acn.TasName2 stgFileName safeText mainHash
+                | Some [] | None -> safeText
             let colored =
                 match t.Type with
                 |acnLexer.StringLiteral
@@ -97,9 +159,7 @@ let PrintAcnAsHTML2 stgFileName (r:AstRoot)  (icdHashesToPrint:string list) =
     r.acnParseResults |>
     Seq.map(fun pr -> pr.fileName, pr.tokens) |>
     Seq.map(fun (fName, tokens) ->
-            //let f = r.Files |> Seq.find(fun x -> Path.GetFileNameWithoutExtension(x.FileName) = Path.GetFileNameWithoutExtension(fName))
-            //let tasNames = f.Modules |> Seq.collect(fun x -> x.TypeAssignments) |> Seq.map(fun x -> x.Name.Value) |> Seq.toArray
-            let content = tokens |> Seq.map(fun token -> colorize(token))
+            let content = tokens |> Seq.mapi(fun idx token -> colorize fName idx token)
             icd_acn.EmitFilePart2  stgFileName (Path.GetFileName fName) (content)
     ) |> Seq.toList
 
@@ -213,7 +273,8 @@ let emitSequenceComponent (r:AstRoot) stgFileName (optionalLikeUperChildren:Asn1
     let acnMinSizeInBits = (if bAlwaysAbsent then 0I else ch.acnMinSizeInBits) - nAlignToNextSize
     let sMaxBits, sMaxBytes = acnMaxSizeInBits.ToString(), BigInteger(System.Math.Ceiling(double(acnMaxSizeInBits)/8.0)).ToString()
     let sMinBits, sMinBytes = acnMinSizeInBits.ToString(), BigInteger(System.Math.Ceiling(double(acnMinSizeInBits)/8.0)).ToString()
-    icd_acn.EmitSeqOrChoiceRow stgFileName sClass nIndex ch.Name sComment  sPresentWhen  sType sAsn1Constraints sMinBits sMaxBits noAlignToNextSize soUnit
+    // old pipeline: no bit-offset column (roadmap D1 populates it in the new pipeline only)
+    icd_acn.EmitSeqOrChoiceRow stgFileName sClass nIndex ch.Name sComment  sPresentWhen  sType sAsn1Constraints sMinBits sMaxBits noAlignToNextSize soUnit None None
 
 
 let rec printType stgFileName (tas:GenerateUperIcd.IcdTypeAssignment) (t:Asn1Type) (m:Asn1Module) (r:AstRoot)  isAnonymousType : string list=
@@ -285,7 +346,7 @@ let rec printType stgFileName (tas:GenerateUperIcd.IcdTypeAssignment) (t:Asn1Typ
                     optionalLikeUperChildren |> Seq.mapi(fun i c -> icd_acn.EmitSequencePreambleSingleComment stgFileName (BigInteger (i+1)) c.Name.Value)
 
                 let nLen = optionalLikeUperChildren |> Seq.length
-                let ret = icd_acn.EmitSeqOrChoiceRow stgFileName (icd_acn.OddRow stgFileName ()) 1I "Preamble" (icd_acn.EmitSequencePreambleComment stgFileName arrsOptWihtNoPresentWhenChildren)  "always"  "Bit mask" "N.A." (nLen.ToString()) (nLen.ToString()) None None
+                let ret = icd_acn.EmitSeqOrChoiceRow stgFileName (icd_acn.OddRow stgFileName ()) 1I "Preamble" (icd_acn.EmitSequencePreambleComment stgFileName arrsOptWihtNoPresentWhenChildren)  "always"  "Bit mask" "N.A." (nLen.ToString()) (nLen.ToString()) None None None None
                 Some ret
         let emitSequenceRow (i:int, curResult:string list) (ch:SeqChildInfo) =
             let di, newLines =
@@ -299,7 +360,7 @@ let rec printType stgFileName (tas:GenerateUperIcd.IcdTypeAssignment) (t:Asn1Typ
                         let lengthLine =
                             let sClass = if i % 2 = 0 then (icd_acn.EvenRow stgFileName ()) else (icd_acn.OddRow stgFileName ())
 
-                            icd_acn.EmitSeqOrChoiceRow stgFileName sClass (BigInteger i) "length" "uper length determinant"  "???"  "OCTET STRING" "N/A" sMinBits sMaxBits None None
+                            icd_acn.EmitSeqOrChoiceRow stgFileName sClass (BigInteger i) "length" "uper length determinant"  "???"  "OCTET STRING" "N/A" sMinBits sMaxBits None None None None
 
                         1, [emitSequenceComponent r stgFileName optionalLikeUperChildren i ch]
                     | _ -> 1, [emitSequenceComponent r stgFileName optionalLikeUperChildren i ch]
@@ -362,7 +423,7 @@ let rec printType stgFileName (tas:GenerateUperIcd.IcdTypeAssignment) (t:Asn1Typ
             let sMaxBits, sMaxBytes = ch.chType.acnMaxSizeInBits.ToString(), BigInteger(System.Math.Ceiling(double(ch.chType.acnMaxSizeInBits)/8.0)).ToString()
             let sMinBits, sMinBytes = ch.chType.acnMinSizeInBits.ToString(), BigInteger(System.Math.Ceiling(double(ch.chType.acnMinSizeInBits)/8.0)).ToString()
             let soUnit = GenerateUperIcd.getUnits ch.chType
-            icd_acn.EmitSeqOrChoiceRow stgFileName sClass nIndex ch.Name.Value sComment  sPresentWhen  sType sAsn1Constraints sMinBits sMaxBits None soUnit
+            icd_acn.EmitSeqOrChoiceRow stgFileName sClass nIndex ch.Name.Value sComment  sPresentWhen  sType sAsn1Constraints sMinBits sMaxBits None soUnit None None
         let children = chInfo.children
         let children = children |> List.filter(fun ch -> match ch.Optionality with  Some (Asn1AcnAst.ChoiceAlwaysAbsent) -> false | _ -> true)
         let arrRows =
@@ -375,7 +436,7 @@ let rec printType stgFileName (tas:GenerateUperIcd.IcdTypeAssignment) (t:Asn1Typ
                     | false     ->
                         let sComment = icd_acn.EmitChoiceIndexComment stgFileName ()
                         let indexSize = (GetChoiceUperDeterminantLengthInBits(BigInteger(Seq.length children))).ToString()
-                        let ret = icd_acn.EmitSeqOrChoiceRow stgFileName (icd_acn.OddRow stgFileName ()) (BigInteger 1) "ChoiceIndex" sComment  "always"  "unsigned int" "N.A." indexSize indexSize None None
+                        let ret = icd_acn.EmitSeqOrChoiceRow stgFileName (icd_acn.OddRow stgFileName ()) (BigInteger 1) "ChoiceIndex" sComment  "always"  "unsigned int" "N.A." indexSize indexSize None None None None
                         [ret], 2
                     //icd_acn.EmitSeqOrChoiceRow stgFileName sClass nIndex ch.Name.Value sComment  sPresentWhen  sType sAsn1Constraints sMinBits sMaxBits
                 let getPresenceWhenNone_uper (i:int) (ch:ChChildInfo) =
@@ -430,6 +491,7 @@ let rec printType stgFileName (tas:GenerateUperIcd.IcdTypeAssignment) (t:Asn1Typ
             | Asn1AcnAst.Acn_Enc_String_uPER_Ascii                             characterSizeInBits             -> "ASCII CHARACTER"   , characterSizeInBits.ToString()
             | Asn1AcnAst.Acn_Enc_String_Ascii_Null_Terminated                  (characterSizeInBits, nullChars)  -> "ASCII CHARACTER"  , characterSizeInBits.ToString()
             | Asn1AcnAst.Acn_Enc_String_Ascii_External_Field_Determinant      (characterSizeInBits, rp)        -> "ASCII CHARACTER"   , characterSizeInBits.ToString()
+            | Asn1AcnAst.Acn_Enc_String_Ascii_Deduced                          characterSizeInBits              -> "ASCII CHARACTER"   , characterSizeInBits.ToString()
             | Asn1AcnAst.Acn_Enc_String_CharIndex_External_Field_Determinant  (characterSizeInBits, rp)        -> "NUMERIC CHARACTER" , characterSizeInBits.ToString()
         let ChildRow (lineFrom:BigInteger) (i:BigInteger) =
             let sClass = if i % 2I = 0I then icd_acn.EvenRow stgFileName () else icd_acn.OddRow stgFileName ()
@@ -462,6 +524,8 @@ let rec printType stgFileName (tas:GenerateUperIcd.IcdTypeAssignment) (t:Asn1Typ
                 (ChildRow 0I 1I)::(icd_acn.EmitRowWith3Dots stgFileName ())::(ChildRow 0I ( nMax))::[], sprintf "Length determined by external field %s" (rp.AsString)
             | Asn1AcnAst.Acn_Enc_String_CharIndex_External_Field_Determinant  (nSizeInBits, rp)        ->
                 (ChildRow 0I 1I)::(icd_acn.EmitRowWith3Dots stgFileName ())::(ChildRow 0I ( nMax))::[], sprintf "Length determined by external field %s" (rp.AsString)
+            | Asn1AcnAst.Acn_Enc_String_Ascii_Deduced                          nSizeInBits              ->
+                (ChildRow 0I 1I)::(icd_acn.EmitRowWith3Dots stgFileName ())::(ChildRow 0I ( nMax))::[], "Length is deduced from the size of the enclosing container/PDU (no length determinant is encoded)."
         let sCommentLine = match sCommentLine with
                            | null | ""  -> sExtraComment
                            | _          -> sprintf "%s%s%s" sCommentLine (icd_acn.NewLine stgFileName ()) sExtraComment
@@ -552,6 +616,10 @@ let rec printType stgFileName (tas:GenerateUperIcd.IcdTypeAssignment) (t:Asn1Typ
                 (ChildRow 0I 1I)::[], sprintf "Length is determined by the external field: %s" relPath.AsString
             | Asn1AcnAst.SZ_EC_ExternalField relPath,true     ->
                 (ChildRow 0I 1I)::(icd_acn.EmitRowWith3Dots stgFileName ())::(ChildRow 0I (nMax))::[], sprintf "Length determined by external field %s" relPath.AsString
+            | Asn1AcnAst.SZ_EC_Deduced, false ->
+                (ChildRow 0I 1I)::[], "Length is deduced from the size of the enclosing container/PDU (no length determinant is encoded)."
+            | Asn1AcnAst.SZ_EC_Deduced, true ->
+                (ChildRow 0I 1I)::(icd_acn.EmitRowWith3Dots stgFileName ())::(ChildRow 0I (nMax))::[], "Length is deduced from the size of the enclosing container/PDU (no length determinant is encoded)."
             | Asn1AcnAst.SZ_EC_TerminationPattern bitPattern, false ->
                 (ChildRow 0I 1I)::[], sprintf "Length is determined by the stop marker '%s'" bitPattern.Value
             | Asn1AcnAst.SZ_EC_TerminationPattern bitPattern, true ->
@@ -572,20 +640,28 @@ let PrintTas stgFileName (tas:GenerateUperIcd.IcdTypeAssignment) (m:Asn1Module) 
     tasses |> List.map (icd_acn.EmitTass stgFileName ) |> Seq.StrJoin "\n"
 
 
+// Name of the .acn file that defines the given module (the file whose token
+// stream contains the module name), if any.
+let moduleAcnFileName (r:AstRoot) (moduleName:string) =
+    match r.acnParseResults |> Seq.tryFind(fun (rp) -> rp.tokens |> Seq.exists (fun (token:IToken) -> token.Text = moduleName)) with
+    | Some (rp) -> (Some (Path.GetFileName(rp.fileName)))
+    | None                  -> None
+
+// Module comments with the ASN.1 comment markers stripped.
+let moduleCleanedComments (m:Asn1Module) =
+    m.Comments |> Array.map (fun x -> x.Trim().Replace("--", "").Replace("/*", "").Replace("*/",""))
+
 let PrintModule stgFileName (m:Asn1Module) (f:Asn1File) (r:AstRoot)   =
     //let blueTasses = GenerateUperIcd.getModuleBlueTasses m |> Seq.map snd
     //let sortedTas = m.TypeAssignments //spark_spec.SortTypeAssignments m r acn |> List.rev
     let icdTasses = GenerateUperIcd.getModuleIcdTasses m
 
     let tases = icdTasses |> Seq.map (fun x -> PrintTas stgFileName x m r )
-    let comments = m.Comments |> Array.map (fun x -> x.Trim().Replace("--", "").Replace("/*", "").Replace("*/",""))
+    let comments = moduleCleanedComments m
     let moduleName = m.Name.Value
     let title = if comments.Length > 0 then moduleName + " - " + comments.[0] else moduleName
     let commentsTail = if comments.Length > 1 then comments.[1..] else [||]
-    let acnFileName =
-        match r.acnParseResults |> Seq.tryFind(fun (rp) -> rp.tokens |> Seq.exists (fun (token:IToken) -> token.Text = moduleName)) with
-        | Some (rp) -> (Some (Path.GetFileName(rp.fileName)))
-        | None                  -> None
+    let acnFileName = moduleAcnFileName r moduleName
 
     icd_acn.EmitModule stgFileName title (Path.GetFileName(f.FileName)) acnFileName commentsTail tases
 
@@ -619,23 +695,182 @@ let emitTypeCol stgFileName (r:AstRoot) (sType : IcdTypeCol) =
         let label = (selectTypeWithSameHash (r.icdHashes[hash])).name
         icd_acn.EmitSeqChild_RefType stgFileName label hash
 
+// Hash of the table emitted for the type assignment (modName, tasName) — the
+// link target for an ACN parameter whose type is a TAS. None when that TAS has
+// no table in the selected set (e.g. filtered out by -icdPdus); the caller then
+// falls back to plain text instead of emitting a dead link.
+let tryFindTasTableHash (r:AstRoot) (selectedHashes:Set<string>) (modName:string) (tasName:string) : string option =
+    r.icdHashes |>
+    Map.toSeq |>
+    Seq.collect snd |>
+    Seq.choose(fun z ->
+        match z.tasInfo with
+        | Some ti when ti.modName = modName && ti.tasName = tasName -> Some z.hash
+        | Some _ -> None
+        | None -> None) |>
+    Seq.filter selectedHashes.Contains |>
+    Seq.sort |>
+    Seq.tryHead
 
-let emitIcdRow stgFileName (r:AstRoot) _i (rw:IcdRow) =
+// One PrintParam row per ACN parameter of a parameterized type — restores the
+// old pipeline's "ACN Parameters" section above the field rows (roadmap B2).
+let emitTasParams stgFileName (r:AstRoot) (selectedHashes:Set<string>) (icdTas:IcdTypeAss) (colSpan:BigInteger) =
+    icdTas.acnParameters |>
+    List.mapi(fun i p ->
+        let sType =
+            match p.prmType with
+            | IcdPrmBasic label -> label
+            | IcdPrmRefTas (modName, tasName) ->
+                match tryFindTasTableHash r selectedHashes modName tasName with
+                | Some hash -> icd_acn.EmitSeqChild_RefType stgFileName tasName hash
+                | None      -> tasName
+        icd_acn.PrintParam stgFileName (i+1).AsBigInt p.name sType colSpan)
+
+
+// ============================================================================
+// Per-row bit offset ("starts at" column) - roadmap D1.
+// The offset of a row is the cumulative bit position at which the field starts,
+// measured from the start of the type/table. It is an exact number while every
+// preceding row is fixed-size and guaranteed present; a "min..max" range once a
+// preceding row is variable-size or optional; and "variable" once a repetition
+// has been elided by a ThreeDOTs row (the hidden repeats make the position
+// unbounded from the row list alone). CHOICE alternatives all restart at the
+// same offset - after the fixed choice-index preamble, if any - because exactly
+// one alternative is present on the wire; optional/conditional SEQUENCE rows
+// contribute 0 to the guaranteed minimum (they may be absent). Computed purely
+// from the already-rendered rows, so it does not touch the content hash or the
+// generated code.
+type private IcdRowOffset =
+    | OffExact    of BigInteger
+    | OffRange    of BigInteger * BigInteger
+    | OffVariable
+    | OffNone                        // the ThreeDOTs row itself: no offset
+
+let private computeRowOffsets (kind:string) (rows: IcdRow list) : IcdRowOffset list =
+    let isAlways (rw:IcdRow) = rw.sPresent = "always"
+    let isNever  (rw:IcdRow) = rw.sPresent = "never"
+    let offsetOf (curMin:BigInteger) (curMax:BigInteger) (variable:bool) =
+        if variable then OffVariable
+        elif curMin = curMax then OffExact curMin
+        else OffRange(curMin, curMax)
+    match kind with
+    | "CHOICE" ->
+        // Leading "always" rows are the choice-index preamble (the ACN index
+        // determinant, when present); they accumulate into the base offset that
+        // every alternative restarts from.
+        let preamble = rows |> List.takeWhile (fun rw -> rw.rowType <> ThreeDOTs && isAlways rw)
+        let rest = rows |> List.skip preamble.Length
+        let preambleOffsets, (baseMin, baseMax) =
+            preamble |> List.mapFold (fun (cMin, cMax) rw ->
+                offsetOf cMin cMax false, (cMin + rw.minLengthInBits, cMax + rw.maxLengthInBits)) (0I, 0I)
+        // An alternative is a maximal run of rows sharing the same presence
+        // condition; each restarts at the base offset, and rows within it (e.g.
+        // a sizeable alternative's Length + content) accumulate because they are
+        // all present once that alternative is selected.
+        let restOffsets =
+            rest |> List.mapFold (fun (cMin, cMax, variable, curCond, prevSub) rw ->
+                match rw.rowType with
+                // Collapsed SEQUENCE OF element (roadmap D2): the alternative's
+                // header row already carries the whole array size, so the element
+                // rows and the ThreeDOTs that closes the group are transparent.
+                | SubItemRow -> OffNone, (cMin, cMax, variable, curCond, true)
+                | ThreeDOTs ->
+                    match prevSub with
+                    | true  -> OffNone, (cMin, cMax, variable, curCond, false)
+                    | false -> OffNone, (cMin, cMax, true, curCond, false)
+                | _ ->
+                    let cMin, cMax, variable =
+                        if curCond <> Some rw.sPresent then baseMin, baseMax, false
+                        else cMin, cMax, variable
+                    offsetOf cMin cMax variable,
+                    (cMin + rw.minLengthInBits, cMax + rw.maxLengthInBits, variable, Some rw.sPresent, false)) (baseMin, baseMax, false, None, false)
+            |> fst
+        preambleOffsets @ restOffsets
+    | _ ->
+        // SEQUENCE / SEQUENCE OF / sizeable / primitive: linear accumulation.
+        // A guaranteed-present row advances the minimum by its own minimum; an
+        // optional/conditional row advances only the maximum (it may be absent);
+        // an always-absent row advances neither.
+        rows |> List.mapFold (fun (cMin, cMax, variable, prevSub) rw ->
+            match rw.rowType with
+            // Collapsed SEQUENCE OF element (roadmap D2): the header row already
+            // accounts for the whole array size, so the element rows show no
+            // offset and do not advance the parent's position.
+            | SubItemRow -> OffNone, (cMin, cMax, variable, true)
+            // A ThreeDOTs that closes a collapsed SEQUENCE OF group is
+            // transparent; a top-level ThreeDOTs (elided repeats of an embedded
+            // sizeable) makes downstream offsets unbounded.
+            | ThreeDOTs ->
+                match prevSub with
+                | true  -> OffNone, (cMin, cMax, variable, false)
+                | false -> OffNone, (cMin, cMax, true, false)
+            | _ ->
+                let minContrib = if isAlways rw then rw.minLengthInBits else 0I
+                let maxContrib = if isNever rw then 0I else rw.maxLengthInBits
+                offsetOf cMin cMax variable, (cMin + minContrib, cMax + maxContrib, variable, false)) (0I, 0I, false, false)
+        |> fst
+
+let private offsetDisplayBits (n:BigInteger) = n.ToString(CultureInfo.InvariantCulture)
+
+let private offsetDisplay (off:IcdRowOffset) : string option =
+    match off with
+    | OffExact n    -> Some (offsetDisplayBits n)
+    | OffRange(a,b) -> Some (sprintf "%s..%s" (offsetDisplayBits a) (offsetDisplayBits b))
+    | OffVariable   -> Some "variable"
+    | OffNone       -> None
+
+// The "No" (index) column string of each row - roadmap D2.  A collapsed
+// SEQUENCE OF's element rows (SubItemRow) are sub-numbered "topIndex.elementIndex"
+// under their header FieldRow so the reader sees they belong to the array; every
+// other row returns None, so the template keeps rendering the plain integer
+// $nIndex$ (the byte output of tables without any collapse is unchanged).
+// ThreeDOTs carry no number.
+let private computeRowIndexOverrides (rows: IcdRow list) : string option list =
+    rows |> List.mapFold (fun lastTop rw ->
+        match rw.rowType with
+        | SubItemRow ->
+            let k = match rw.idxOffset with Some z -> z | None -> 1
+            Some (sprintf "%d.%d" lastTop k), lastTop
+        | ThreeDOTs -> None, lastTop
+        | _ ->
+            let n = match rw.idxOffset with Some z -> z | None -> 1
+            None, n) 0 |> fst
+
+let emitIcdRow stgFileName (r:AstRoot) (soOffset:string option) (soIndexOverride:string option) (rw:IcdRow) =
     let i = match rw.idxOffset with Some z -> z | None -> 1
     let sComment = rw.comments |> Seq.StrJoin (icd_uper.NewLine stgFileName ())
-    let sConstraint = match rw.sConstraint with None -> "N.A." | Some x -> x
+    // No constraint -> empty cell.  "N.A." is manufactured noise (roadmap A4).
+    let sConstraint = match rw.sConstraint with None -> "" | Some x -> x
     let sClass = if i % 2 = 0 then (icd_acn.EvenRow stgFileName ()) else (icd_acn.OddRow stgFileName ())
     match rw.rowType with
     |ThreeDOTs -> icd_acn.EmitRowWith3Dots stgFileName ()
-    | _        -> icd_acn.EmitSeqOrChoiceRow stgFileName sClass (BigInteger i) rw.fieldName sComment  rw.sPresent  (emitTypeCol stgFileName r rw.sType) sConstraint (rw.minLengthInBits.ToString()) (rw.maxLengthInBits.ToString()) None rw.sUnits
+    | _        -> icd_acn.EmitSeqOrChoiceRow stgFileName sClass (BigInteger i) rw.fieldName sComment  rw.sPresent  (emitTypeCol stgFileName r rw.sType) sConstraint (rw.minLengthInBits.ToString()) (rw.maxLengthInBits.ToString()) None rw.sUnits soOffset soIndexOverride
 
-let emitTas2 stgFileName (r:AstRoot) myParams (icdTas:IcdTypeAss)  =
-    let sCommentLine = icdTas.comments |> Seq.StrJoin (icd_uper.NewLine stgFileName ())
+// All usage paths that share this table.  More than one element means that
+// byte-identical specializations were merged into a single table by the
+// normalized content hash (roadmap B4).  Deterministic order.
+let usageSitesOfHash (r:AstRoot) (hash:string) : string list =
+    match r.icdHashes.TryFind hash with
+    | Some lst -> lst |> List.map(fun z -> z.typeId.AsString) |> List.distinct |> List.sort
+    | None -> []
+
+let emitTas2 stgFileName (r:AstRoot) (selectedHashes:Set<string>) (displayName:string) (icdTas:IcdTypeAss)  =
+    // The table itself is identified by its own usage path (title/nav); the
+    // remaining sites of a merged table are listed as a table comment.
+    let otherUsageSites =
+        usageSitesOfHash r icdTas.hash |> List.filter(fun site -> site <> icdTas.typeId.AsString)
+    let comments =
+        match otherUsageSites with
+        | [] -> icdTas.comments
+        | _  -> icdTas.comments @ [sprintf "Used by: %s" (otherUsageSites |> String.concat ", ")]
+    let sCommentLine = comments |> Seq.StrJoin (icd_uper.NewLine stgFileName ())
+    let offsets = computeRowOffsets icdTas.kind icdTas.rows
+    let indexOverrides = computeRowIndexOverrides icdTas.rows
     let arRows =
-        icdTas.rows |> List.mapi (fun i rw -> emitIcdRow stgFileName r (i+1) rw)
+        List.map3 (fun rw off soIdx -> emitIcdRow stgFileName r (offsetDisplay off) soIdx rw) icdTas.rows offsets indexOverrides
     let bHasAcnDef = icdTas.hasAcnDefinition
     let sMaxBitsExplained = ""
-    icd_acn.EmitSequenceOrChoice stgFileName false icdTas.name icdTas.hash bHasAcnDef (icdTas.kind) (icdTas.minLengthInBytes.ToString()) (icdTas.maxLengthInBytes.ToString()) sMaxBitsExplained sCommentLine arRows (myParams 4I) (sCommentLine.Split [|'\n'|])
+    icd_acn.EmitSequenceOrChoice stgFileName false displayName icdTas.hash bHasAcnDef (icdTas.kind) (icdTas.minLengthInBytes.ToString()) (icdTas.maxLengthInBytes.ToString()) sMaxBitsExplained sCommentLine arRows (emitTasParams stgFileName r selectedHashes icdTas 4I) (sCommentLine.Split [|'\n'|])
 
 (*
 let rec PrintType2 stgFileName (r:AstRoot)  acnParams (icdTas:IcdTypeAss): string list =
@@ -698,43 +933,355 @@ let PrintTasses2 stgFileName (r:AstRoot) : string list =
         | None -> None) |>
     Seq.toList
 *)
-let printTasses3 stgFileName (r:DAst.AstRoot) : (string list)*(string list)*(IcdTypeAss list) =
+// Returns the hashes of the ICD type assignments that are reachable from the
+// requested PDU roots (all type assignments when -icdPdus is not given), in
+// document order. This is the set of tables printed in the new-pipeline ICD
+// and dumped by -icdRaw.
+let selectIcdHashesToPrint (r:DAst.AstRoot) : string list =
     let pdus = r.args.icdPdus |> Option.map Set.ofList
-    let icdHashesToPrint =
-        seq {
-            for f in r.Files do
-                for m in f.Modules do
-                    for tas in m.TypeAssignments do
-                        match pdus.IsNone || pdus.Value.Contains tas.Name.Value with
-                        | true  -> 
-                            match tas.Type.icdTas with
-                            | Some icdTas -> 
-                                let icdTassesHash = getMySelfAndChildren r icdTas
-                                yield! icdTassesHash
-                            | None -> ()
-                        | false -> ()
-        } |> Seq.distinct |> Seq.toList
-    //print in a file the icds that are going to be printed
-    let content = icdHashesToPrint |> Seq.StrJoin "\n"
-    let fileName = sprintf "%s_icdHashesToPrint.txt" stgFileName
-    File.WriteAllText(fileName, content)
-    let files, navLinks =
-        icdHashesToPrint
-        |> Seq.choose(fun hash ->
-            match r.icdHashes.TryFind hash with
-            | Some chIcdTas -> 
-                //let PrintNavLink stgFileName sTitle sTarget   =
-                let tas = selectTypeWithSameHash chIcdTas
-                let tasContent = emitTas2 stgFileName r (fun _ -> []) tas
-                //let tasLink = icd_acn.EmitNavLink stgFileName tas.name tas.hash
-                Some (tasContent, tas)
-            | None -> None) |> Seq.toList |> List.unzip
-    (files, icdHashesToPrint, navLinks)
+    seq {
+        for f in r.Files do
+            for m in f.Modules do
+                for tas in m.TypeAssignments do
+                    match pdus.IsNone || pdus.Value.Contains tas.Name.Value with
+                    | true  ->
+                        match tas.Type.icdTas with
+                        | Some icdTas ->
+                            let icdTassesHash = getMySelfAndChildren r icdTas
+                            yield! icdTassesHash
+                        | None -> ()
+                    | false -> ()
+    } |> Seq.distinct |> Seq.toList
 
-let PrintAsn1FileInColorizedHtml (stgFileName:string) (r:AstRoot) (icdHashesToPrint:string list) (f:Asn1File) =
+// The representative IcdTypeAss of every selected hash, in the given order.
+let private representativesOf (r:AstRoot) (icdHashesToPrint:string list) : (string*IcdTypeAss) list =
+    icdHashesToPrint |>
+    List.choose(fun h -> r.icdHashes.TryFind h |> Option.map(fun lst -> h, selectTypeWithSameHash lst))
+
+// Display names of the selected tables, keyed by hash.  A display name shared
+// by several tables (an in-context specialization reusing the bare TAS name,
+// R7) is disambiguated with the usage context - "Samples (as Telemetry.smpl)"
+// - while the TAS definition itself keeps the bare name.  Used for the nav
+// pane, the table titles and the -icdRaw name field (roadmap B4).
+let buildDisplayNameMap (r:AstRoot) (icdHashesToPrint:string list) : Map<string,string> =
+    let contextOf (tas:IcdTypeAss) (withModule:bool) =
+        let (ReferenceToType nodes) = tas.typeId
+        let nodes =
+            match withModule, nodes with
+            | false, (MD _)::rest -> rest
+            | _ -> nodes
+        nodes |> List.map(fun n -> n.AsString) |> String.concat "."
+    let proposed =
+        representativesOf r icdHashesToPrint |>
+        List.groupBy(fun (_, tas) -> tas.name) |>
+        List.collect(fun (name, members) ->
+            match members with
+            | [(h, _)] -> [(h, name)]
+            | _ ->
+                let tasBearing = members |> List.filter(fun (_, tas) -> tas.tasInfo.IsSome)
+                match tasBearing with
+                | _::_::_ ->
+                    // the same TAS name exists in more than one module: qualify everything with the full path
+                    members |> List.map(fun (h, tas) -> (h, sprintf "%s (as %s)" name (contextOf tas true)))
+                | _ ->
+                    members |> List.map(fun (h, tas) ->
+                        match tas.tasInfo with
+                        | Some _ -> (h, name)  // the TAS definition keeps the bare name
+                        | None   -> (h, sprintf "%s (as %s)" name (contextOf tas false)))) |>
+        Map.ofList
+    // Deterministic last-resort uniquification, in document order (two
+    // distinct tables normally differ in name or usage context by now).
+    let addHash (used:Set<string>, acc:Map<string,string>) (hash:string) =
+        match proposed.TryFind hash with
+        | None -> (used, acc)
+        | Some name ->
+            let rec unique candidate n =
+                match used.Contains candidate with
+                | false -> candidate
+                | true  -> unique (sprintf "%s #%d" name n) (n+1)
+            let finalName = unique name 2
+            (used.Add finalName, acc.Add(hash, finalName))
+    icdHashesToPrint |> List.fold addHash (Set.empty, Map.empty) |> snd
+
+// True when -icdPdus was given and this table is one of the requested PDU
+// roots; the nav pane lists those first and renders them visually distinct.
+let isIcdPduRoot (r:AstRoot) (tas:IcdTypeAss) =
+    match r.args.icdPdus, tas.tasInfo with
+    | Some roots, Some ti -> roots |> List.contains ti.tasName
+    | _, _ -> false
+
+// Groups the selected hashes by their owning ASN.1 module, in file/module
+// declaration order; inside a module the tables keep their first-reference
+// order, except that the -icdPdus roots come first (roadmap B4).  The final
+// group without file/module collects tables whose module is not among the
+// compiled files (defensive; should not happen).
+let orderTablesByModule (r:AstRoot) (icdHashesToPrint:string list) : (Asn1File option * Asn1Module option * string list) list =
+    let reps = representativesOf r icdHashesToPrint
+    let groups =
+        [ for f in r.Files do
+            for m in f.Modules do
+                let mine = reps |> List.filter(fun (_, tas) -> tas.typeId.ModName = m.Name.Value)
+                let ordered =
+                    match r.args.icdPdus with
+                    | None   -> mine
+                    | Some _ ->
+                        let roots, others = mine |> List.partition(fun (_, tas) -> isIcdPduRoot r tas)
+                        roots@others
+                match ordered with
+                | [] -> ()
+                | _  -> yield (Some f, Some m, ordered |> List.map fst) ]
+    let claimed = groups |> List.collect(fun (_, _, hs) -> hs) |> Set.ofList
+    let leftover = icdHashesToPrint |> List.filter(fun h -> not (claimed.Contains h))
+    match leftover with
+    | [] -> groups
+    | _  -> groups@[(None, None, leftover)]
+
+// One nav-pane entry of the new-pipeline document.
+type IcdNavEntry = {
+    navDisplayName : string
+    navHash        : string
+    navIsPduRoot   : bool
+}
+
+// One rendered module of the new-pipeline document body plus what the nav
+// pane needs for it (body and nav are grouped by module, roadmap B4).
+type IcdDocModule = {
+    docModName    : string option  // None: fallback group without a module header
+    docContent    : string
+    docNavEntries : IcdNavEntry list
+}
+
+let printTasses3 stgFileName (r:DAst.AstRoot) : (string list)*(IcdDocModule list) =
+    let icdHashesToPrint = selectIcdHashesToPrint r
+    let selectedHashes = icdHashesToPrint |> Set.ofList
+    let displayNames = buildDisplayNameMap r icdHashesToPrint
+    let displayNameOf (tas:IcdTypeAss) =
+        match displayNames.TryFind tas.hash with
+        | Some dn -> dn
+        | None    -> tas.name
+    let moduleGroups = orderTablesByModule r icdHashesToPrint
+    let docModules =
+        moduleGroups |>
+        List.map(fun (soFile, soModule, hashes) ->
+            let tables =
+                representativesOf r hashes |>
+                List.map(fun (_, tas) -> (tas, emitTas2 stgFileName r selectedHashes (displayNameOf tas) tas))
+            let navEntries =
+                tables |> List.map(fun (tas, _) ->
+                    {navDisplayName = displayNameOf tas; navHash = tas.hash; navIsPduRoot = isIcdPduRoot r tas})
+            let wrappedTables = tables |> List.map (fun (_, tasContent) -> icd_acn.EmitTass stgFileName tasContent)
+            let content =
+                match soFile, soModule with
+                | Some f, Some m ->
+                    // Unlike the old pipeline, sModName is the bare module name: the
+                    // EmitModule anchor (ICD_<module>) must match the nav module link.
+                    icd_acn.EmitModule stgFileName m.Name.Value (Path.GetFileName(f.FileName)) (moduleAcnFileName r m.Name.Value) (moduleCleanedComments m) wrappedTables
+                | _, _ ->
+                    wrappedTables |> String.concat "\n"
+            {docModName = soModule |> Option.map(fun m -> m.Name.Value); docContent = content; docNavEntries = navEntries})
+    let orderedHashes = moduleGroups |> List.collect(fun (_, _, hs) -> hs)
+    (orderedHashes, docModules)
+
+// ============================================================================
+// -icdRaw : deterministic, machine-readable JSON dump of the new-pipeline ICD
+// model (the same reachable IcdTypeAss set that printTasses3 renders as HTML).
+// Tables are identified by a stable id (display name + typeId usage path)
+// instead of the MD5 content hash, so the dump stays diffable across compiler
+// changes that only affect rendered details. No timestamps, stable ordering,
+// invariant to machine/locale (ASCII-only output, invariant-culture numbers).
+// ============================================================================
+
+type private JsonValue =
+    | JString of string
+    | JNumber of BigInteger
+    | JBool of bool
+    | JNull
+    | JArray of JsonValue list
+    | JObject of (string*JsonValue) list
+
+let private jsonEscapeString (s:string) =
+    // Normalize line endings so the dump is byte-identical regardless of the
+    // source file's EOL convention: a block comment read from a CRLF checkout
+    // (e.g. on Windows/WSL) must produce the same JSON as an LF checkout (CI).
+    // Without this the golden files would depend on the checkout's line endings.
+    let s = s.Replace("\r\n", "\n").Replace("\r", "\n")
+    let sb = System.Text.StringBuilder()
+    sb.Append('"') |> ignore
+    s |> Seq.iter(fun c ->
+        match c with
+        | '"'  -> sb.Append("\\\"") |> ignore
+        | '\\' -> sb.Append("\\\\") |> ignore
+        | '\b' -> sb.Append("\\b")  |> ignore
+        | '\f' -> sb.Append("\\f")  |> ignore
+        | '\n' -> sb.Append("\\n")  |> ignore
+        | '\r' -> sb.Append("\\r")  |> ignore
+        | '\t' -> sb.Append("\\t")  |> ignore
+        | c when c < ' ' || c > '~' -> sb.AppendFormat(CultureInfo.InvariantCulture, "\\u{0:x4}", int c) |> ignore
+        | c    -> sb.Append(c) |> ignore)
+    sb.Append('"') |> ignore
+    sb.ToString()
+
+let rec private formatJson (indentLevel:int) (jv:JsonValue) : string =
+    let pad    = String.replicate indentLevel "  "
+    let padIn  = String.replicate (indentLevel+1) "  "
+    match jv with
+    | JNull         -> "null"
+    | JBool true    -> "true"
+    | JBool false   -> "false"
+    | JNumber bi    -> bi.ToString(CultureInfo.InvariantCulture)
+    | JString s     -> jsonEscapeString s
+    | JArray []     -> "[]"
+    | JArray items  ->
+        let inner = items |> List.map (fun it -> padIn + formatJson (indentLevel+1) it) |> String.concat ",\n"
+        "[\n" + inner + "\n" + pad + "]"
+    | JObject []     -> "{}"
+    | JObject fields ->
+        let inner = fields |> List.map (fun (k,v) -> padIn + jsonEscapeString k + ": " + formatJson (indentLevel+1) v) |> String.concat ",\n"
+        "{\n" + inner + "\n" + pad + "}"
+
+// Stable identifier of an ICD table: display name + typeId usage path.
+let private icdTasStableId (tas:IcdTypeAss) =
+    sprintf "%s@%s" tas.name tas.typeId.AsString
+
+// Maps each selected hash to a unique stable id. Two distinct tables normally
+// differ in name or usage path; should they ever coincide, a deterministic
+// #2/#3... suffix (in nav order) keeps the ids unique.
+let private buildStableIdMap (r:AstRoot) (icdHashesToPrint:string list) : Map<string,string> =
+    let addHash (used:Set<string>, acc:Map<string,string>) (hash:string) =
+        match r.icdHashes.TryFind hash with
+        | None -> (used, acc)
+        | Some lst ->
+            let baseId = icdTasStableId (selectTypeWithSameHash lst)
+            let rec unique candidate n =
+                match used.Contains candidate with
+                | false -> candidate
+                | true  -> unique (sprintf "%s#%d" baseId n) (n+1)
+            let finalId = unique baseId 2
+            (used.Add finalId, acc.Add(hash, finalId))
+    icdHashesToPrint |> List.fold addHash (Set.empty, Map.empty) |> snd
+
+let private jsonOfIcdTypeCol (r:AstRoot) (stableIds:Map<string,string>) (col:IcdTypeCol) =
+    match col with
+    | IcdPlainType label -> JObject [ ("kind", JString "plain"); ("value", JString label) ]
+    | TypeHash hash ->
+        // A reference row normally targets a table in the selected set; a
+        // dangling reference (hash unknown) is dumped as null so that the ICD
+        // test invariants can detect it rather than crash the compiler.
+        let referencedId =
+            match stableIds.TryFind hash with
+            | Some sid -> Some sid
+            | None ->
+                match r.icdHashes.TryFind hash with
+                | Some lst -> Some (icdTasStableId (selectTypeWithSameHash lst))
+                | None -> None
+        match referencedId with
+        | Some sid -> JObject [ ("kind", JString "reference"); ("id", JString sid) ]
+        | None     -> JObject [ ("kind", JString "reference"); ("id", JNull) ]
+
+let private icdRowTypeName (rowType:IcdRowType) =
+    match rowType with
+    | FieldRow                    -> "FieldRow"
+    | ReferenceToCompositeTypeRow -> "ReferenceToCompositeTypeRow"
+    | LengthDeterminantRow        -> "LengthDeterminantRow"
+    | PresentDeterminantRow       -> "PresentDeterminantRow"
+    | PaddingRow                  -> "PaddingRow"
+    | SubItemRow                  -> "SubItemRow"
+    | ThreeDOTs                   -> "ThreeDOTs"
+
+// The cumulative bit offset ("starts at") of a row - roadmap D1. exact/range
+// carry finite bounds; variable (post-ThreeDOTs) and none (the ThreeDOTs row
+// itself) carry null bounds. display mirrors the HTML "Offset (bits)" column.
+let private jsonOfOffset (off:IcdRowOffset) =
+    let s (n:BigInteger) = n.ToString(CultureInfo.InvariantCulture)
+    match off with
+    | OffExact n    -> JObject [ ("kind", JString "exact");    ("minBits", JNumber n); ("maxBits", JNumber n); ("display", JString (s n)) ]
+    | OffRange(a,b) -> JObject [ ("kind", JString "range");    ("minBits", JNumber a); ("maxBits", JNumber b); ("display", JString (sprintf "%s..%s" (s a) (s b))) ]
+    | OffVariable   -> JObject [ ("kind", JString "variable"); ("minBits", JNull);     ("maxBits", JNull);     ("display", JString "variable") ]
+    | OffNone       -> JObject [ ("kind", JString "none");     ("minBits", JNull);     ("maxBits", JNull);     ("display", JNull) ]
+
+let private jsonOfIcdRow (r:AstRoot) (stableIds:Map<string,string>) (off:IcdRowOffset) (rw:IcdRow) =
+    JObject [
+        ("idxOffset", match rw.idxOffset with Some i -> JNumber (BigInteger i) | None -> JNull)
+        ("fieldName", JString rw.fieldName)
+        ("comments", JArray (rw.comments |> List.map JString))
+        ("sPresent", JString rw.sPresent)
+        ("sType", jsonOfIcdTypeCol r stableIds rw.sType)
+        ("sConstraint", match rw.sConstraint with Some c -> JString c | None -> JNull)
+        ("minLengthInBits", JNumber rw.minLengthInBits)
+        ("maxLengthInBits", JNumber rw.maxLengthInBits)
+        ("sUnits", match rw.sUnits with Some u -> JString u | None -> JNull)
+        ("rowType", JString (icdRowTypeName rw.rowType))
+        ("offset", jsonOfOffset off)
+    ]
+
+// ACN parameter of a parameterized type. Mirrors the HTML rendering: the
+// parameter's type is a reference to the TAS's table when that table is part
+// of the emitted set, otherwise the plain TAS name.
+let private jsonOfIcdAcnParameter (r:AstRoot) (stableIds:Map<string,string>) (selectedHashes:Set<string>) (p:IcdAcnParameter) =
+    let typeJson =
+        match p.prmType with
+        | IcdPrmBasic label -> JObject [ ("kind", JString "plain"); ("value", JString label) ]
+        | IcdPrmRefTas (modName, tasName) ->
+            let referencedId =
+                tryFindTasTableHash r selectedHashes modName tasName
+                |> Option.bind stableIds.TryFind
+            match referencedId with
+            | Some sid -> JObject [ ("kind", JString "reference"); ("id", JString sid) ]
+            | None     -> JObject [ ("kind", JString "plain"); ("value", JString tasName) ]
+    JObject [ ("name", JString p.name); ("type", typeJson) ]
+
+let private jsonOfIcdTas (r:AstRoot) (stableIds:Map<string,string>) (selectedHashes:Set<string>) (stableId:string) (displayName:string) (tas:IcdTypeAss) =
+    JObject [
+        ("id", JString stableId)
+        // The rendered label of the table/nav entry: the bare type name,
+        // disambiguated with the usage context when several tables share it.
+        ("name", JString displayName)
+        ("kind", JString tas.kind)
+        ("tasInfo",
+            match tas.tasInfo with
+            | Some ti -> JObject [ ("modName", JString ti.modName); ("tasName", JString ti.tasName) ]
+            | None    -> JNull)
+        ("module", JString tas.typeId.ModName)
+        ("usagePath", JString tas.typeId.AsString)
+        // Every usage path that shares this table; more than one element means
+        // byte-identical specializations were merged by the normalized hash.
+        ("usageSites", JArray (usageSitesOfHash r tas.hash |> List.map JString))
+        ("hasAcnDefinition", JBool tas.hasAcnDefinition)
+        ("minLengthInBytes", JNumber tas.minLengthInBytes)
+        ("maxLengthInBytes", JNumber tas.maxLengthInBytes)
+        ("comments", JArray (tas.comments |> List.map JString))
+        ("acnParameters", JArray (tas.acnParameters |> List.map (jsonOfIcdAcnParameter r stableIds selectedHashes)))
+        ("rows", JArray (List.map2 (jsonOfIcdRow r stableIds) (computeRowOffsets tas.kind tas.rows) tas.rows))
+    ]
+
+let DoWorkIcdRawJson (r:AstRoot) (outFileName:string) =
+    let icdHashesToPrint = selectIcdHashesToPrint r
+    let selectedHashes = icdHashesToPrint |> Set.ofList
+    let displayNames = buildDisplayNameMap r icdHashesToPrint
+    // The dump follows the rendered document order: grouped by module, PDU
+    // roots first when -icdPdus is given (roadmap B4).
+    let orderedHashes = orderTablesByModule r icdHashesToPrint |> List.collect(fun (_, _, hs) -> hs)
+    let stableIds = buildStableIdMap r orderedHashes
+    let tables =
+        orderedHashes |>
+        List.choose(fun hash ->
+            match r.icdHashes.TryFind hash with
+            | Some lst ->
+                let tas = selectTypeWithSameHash lst
+                let displayName =
+                    match displayNames.TryFind hash with
+                    | Some dn -> dn
+                    | None    -> tas.name
+                Some (jsonOfIcdTas r stableIds selectedHashes stableIds.[hash] displayName tas)
+            | None -> None)
+    let navOrder = orderedHashes |> List.choose stableIds.TryFind |> List.map JString
+    let root = JObject [ ("navOrder", JArray navOrder); ("tables", JArray tables) ]
+    File.WriteAllText(outFileName, formatJson 0 root + "\n")
+
+let PrintAsn1FileInColorizedHtml (stgFileName:string) (r:AstRoot) (icdHashesToPrint:string list) (emittedAsn1Anchors: System.Collections.Generic.HashSet<string>) (f:Asn1File) =
     let debug (tsName:string) =
-        r.icdHashes.Values |> 
-        Seq.collect id |> 
+        r.icdHashes.Values |>
+        Seq.collect id |>
         Seq.filter(fun ts -> ts.name = tsName) |>
         Seq.iter(fun ts ->
             let content = DAstUtilFunctions.serializeIcdTasToText ts
@@ -743,21 +1290,45 @@ let PrintAsn1FileInColorizedHtml (stgFileName:string) (r:AstRoot) (icdHashesToPr
     //debug("ALPHA-TC-SECONDARY-HEADER")
     //let tryCreateRefType = CreateAsn1AstFromAntlrTree.CreateRefTypeContent
     let icdHashesToPrintSet = icdHashesToPrint |> Set.ofList
-    let fileModules = f.Modules |> List.map(fun m -> m.Name.Value) |> Set.ofList
-    let fileTypeAssignments =
-        r.icdHashes.Values |>
-        Seq.collect id |>
-        Seq.choose(fun z ->
-            //match z.tasInfo with
-            //| None -> None
-            //| Some ts when icdHashesToPrintSet.Contains z.hash &&  fileModules.Contains ts.modName -> Some (ts.tasName, z.hash)
-            //| Some _ -> None ) |> 
-            match icdHashesToPrintSet.Contains z.hash with
-            | true  -> Some (z.name, z.hash)
-            | false -> None ) |>
-        Seq.distinct |>
-        Seq.groupBy fst |>
-        Seq.map(fun (tasName, tasHashes) -> (tasName, tasHashes |> Seq.map snd |> List.ofSeq)) |> Map.ofSeq
+    // Names of the TASes defined in the ASN.1 sources: only those names have a
+    // definition-site token ("Name ::= ...") that can carry ASN1_<hash> anchors.
+    let asn1DefinedTasNames =
+        r.Files |>
+        List.collect(fun f -> f.Modules) |>
+        List.collect(fun m -> m.TypeAssignments) |>
+        List.map(fun ts -> ts.Name.Value) |>
+        Set.ofList
+    let representativeOf (hash:string) = selectTypeWithSameHash r.icdHashes.[hash]
+    // Every selected table's header links "#ASN1_<its own hash>", so every
+    // selected hash needs an anchor at a TAS definition site (roadmap B5 / R6:
+    // names mapping to several hashes used to render as plain text - no anchor
+    // at all - leaving the ASN.1 link of all their tables dead).  A hash is
+    // attributed to the table's own name when that name is a real TAS; tables
+    // with synthetic names that never appear in the sources (e.g. the
+    // "<path>_OCT_STR" CONTAINING wrappers) are anchored at the definition of
+    // the TAS at the root of their usage path.
+    let anchorNameOfHash (hash:string) : (string*string) option =
+        let rep = representativeOf hash
+        match asn1DefinedTasNames.Contains rep.name with
+        | true  -> Some (rep.name, hash)
+        | false ->
+            let (ReferenceToType nodes) = rep.typeId
+            match nodes with
+            | _::(TA tasName)::_ when asn1DefinedTasNames.Contains tasName -> Some (tasName, hash)
+            | _ -> None
+    let usagePathLength (hash:string) =
+        let (ReferenceToType nodes) = (representativeOf hash).typeId
+        nodes.Length
+    // TAS name -> the hashes anchored at its definition site, shortest usage
+    // path first: the head is the TAS's own (standalone) table, which is what
+    // the source token links to.
+    let fileTypeAssignments : Map<string, string list> =
+        icdHashesToPrint |>
+        List.choose anchorNameOfHash |>
+        List.groupBy fst |>
+        List.map(fun (tasName, pairs) ->
+            (tasName, pairs |> List.map snd |> List.sortBy(fun h -> (usagePathLength h, h)))) |>
+        Map.ofList
 
 
     //let blueTasses = f.Modules |> Seq.collect(fun m -> getModuleBlueTasses m)
@@ -802,36 +1373,28 @@ let PrintAsn1FileInColorizedHtml (stgFileName:string) (r:AstRoot) (icdHashesToPr
                     match findPrevToken with
                     |Some(tok) -> tok
                     |None -> if idx = 0 then t else f.Tokens.[idx-1]
-                //let tasfileTypeAssignments = fileTypeAssignments |> List.filter(fun (tasName,_) -> tasName = t.Text)
-                //match tasfileTypeAssignments with
                 match fileTypeAssignments.TryFind t.Text with
                 | None -> safeText
                 | Some ([]) -> safeText
-                //| (_,tasHash)::[] ->
-                | Some (tasHash::[]) ->
-                    if nextToken.Type = asn1Lexer.ASSIG_OP && prevToken.Type <> asn1Lexer.LID then
-                        icd_uper.TasName stgFileName safeText tasHash
-                    else
-                        icd_uper.TasName2 stgFileName safeText tasHash
-                | Some tasHashList ->
-                    let tasName = t.Text
-                    let debug () =
-                        printfn "Warning: %s is not unique. %d" t.Text tasHashList.Length
-
-                        printfn "Warning: %A" tasHashList
-                        //print to jso the type assignments that are not unique
-                        tasHashList |> 
-                        Seq.iter (fun (tasHash) -> 
-                            let icdTas = r.icdHashes.[tasHash] 
-                            icdTas |> 
-                            Seq.iter(fun icdTas ->
-                                let content = DAstUtilFunctions.serializeIcdTasToText icdTas
-                                let fileName = sprintf "%s_%s.txt" tasName icdTas.hash
-                                File.WriteAllText(fileName, content)))
-                        
-                    //debug ()
-                    safeText
-                //|None -> safeText
+                | Some (mainHash::extraHashes) ->
+                    match nextToken.Type = asn1Lexer.ASSIG_OP && prevToken.Type <> asn1Lexer.LID with
+                    | false -> icd_uper.TasName2 stgFileName safeText mainHash
+                    | true  ->
+                        // Definition site: one ASN1_<hash> anchor per attributed
+                        // table.  HashSet.Add reports whether the hash is new -
+                        // a second definition of the same name (same TAS name in
+                        // another module) must not repeat anchors already
+                        // emitted, so only fresh ones are anchored here.
+                        let freshHashes = (mainHash::extraHashes) |> List.filter(fun h -> emittedAsn1Anchors.Add h)
+                        let extraAnchors =
+                            freshHashes |>
+                            List.filter(fun h -> h <> mainHash) |>
+                            List.map(fun h -> icd_uper.BlueTas stgFileName h "")
+                        let tokenHtml =
+                            match freshHashes |> List.contains mainHash with
+                            | true  -> icd_uper.TasName stgFileName safeText mainHash
+                            | false -> icd_uper.TasName2 stgFileName safeText mainHash
+                        (extraAnchors @ [tokenHtml]) |> String.concat ""
             let colored () =
                 match t.Type with
                 |asn1Lexer.StringLiteral
@@ -850,35 +1413,36 @@ let PrintAsn1FileInColorizedHtml (stgFileName:string) (r:AstRoot) (icdHashesToPr
 
 let DoWork (r:AstRoot) (deps:Asn1AcnAst.AcnInsertedFieldDependencies) (stgFileName:string) (asn1HtmlStgFileMacros:string option)   outFileName =
     let files1 =  TL "GenerateAcnIcd_PrintTasses" (fun () -> r.Files |> List.map (fun f -> PrintTasses stgFileName f r ))
-    let (files1b, icdHashesToPrint, icdTasList ) = TL "GenerateAcnIcd_printTasses3" (fun () -> printTasses3 stgFileName r)
+    let (icdHashesToPrint, docModules) = TL "GenerateAcnIcd_printTasses3" (fun () -> printTasses3 stgFileName r)
+    let files1b = docModules |> List.map(fun dm -> dm.docContent)
     let bAcnParamsMustBeExplained = true
     let asn1HtmlMacros =
         match asn1HtmlStgFileMacros with
         | None  -> stgFileName
         | Some x -> x
-    let files2 = TL "GenerateAcnIcd_PrintAsn1FileInColorizedHtml" (fun () -> r.Files |> List.map (PrintAsn1FileInColorizedHtml asn1HtmlMacros r icdHashesToPrint))
+    // one anchor-uniqueness scope for the whole document (the colorized ASN.1
+    // parts of all files end up in the same HTML page)
+    let emittedAsn1Anchors = System.Collections.Generic.HashSet<string>()
+    let files2 = TL "GenerateAcnIcd_PrintAsn1FileInColorizedHtml" (fun () -> r.Files |> List.map (PrintAsn1FileInColorizedHtml asn1HtmlMacros r icdHashesToPrint emittedAsn1Anchors))
     let files3 = TL "GenerateAcnIcd_PrintAcnAsHTML2" (fun () -> PrintAcnAsHTML2 stgFileName r icdHashesToPrint)
 
-    let navLinks = 
-        icdTasList |> List.map(fun tas -> PrintNavLink stgFileName tas.name tas.hash) |> String.concat "\n"
-     (*
-        seq {
-            for f in r.Files do
-                for m in f.Modules do
-                    let moduleLink = PrintNavLink stgFileName m.Name.Value m.Name.Value
-                    yield moduleLink
-                    let thisModuleTasses = 
-                        icdTasList |>
-                        List.choose(fun tas ->
-                            match tas.tasInfo with
-                            | None -> None
-                            | Some tsInfo when tsInfo.modName = m.Name.Value -> Some tas
-                            | Some _ -> None) |>
-                        List.sortBy (fun tas -> tas.name)
-                    for tas in thisModuleTasses do
-                        let tasLink = PrintNavLink stgFileName tas.name tas.hash
-                        yield tasLink
-        } |> Seq.distinct |> Seq.toList |> String.concat "\n"*)
+    // Nav pane grouped by module, mirroring the document body; the -icdPdus
+    // roots come first within their module and render visually distinct.
+    let navLinks =
+        docModules |>
+        List.collect(fun dm ->
+            let headerLink =
+                match dm.docModName with
+                | Some mn -> [icd_acn.EmitNavModule stgFileName mn]
+                | None    -> []
+            let entryLinks =
+                dm.docNavEntries |>
+                List.map(fun e ->
+                    match e.navIsPduRoot with
+                    | true  -> icd_acn.EmitNavLinkRootPdu stgFileName e.navDisplayName e.navHash
+                    | false -> icd_acn.EmitNavLink stgFileName e.navDisplayName e.navHash)
+            headerLink @ entryLinks) |>
+        String.concat "\n"
 
     let cssFileName = Path.ChangeExtension(outFileName, ".css")
     let htmlContent = TL "GenerateAcnIcd_RootHtml" (fun () -> icd_acn.RootHtml stgFileName files1 files2 bAcnParamsMustBeExplained files3 (Path.GetFileName(cssFileName)) navLinks)

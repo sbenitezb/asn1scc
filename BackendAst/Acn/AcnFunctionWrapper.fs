@@ -78,11 +78,46 @@ let createAcnFunction (r: Asn1AcnAst.AstRoot)
     let varName = p.accessPath.rootId
     let sStar = lm.lg.getStar p.accessPath
     let sInitialExp = ""
+    // Zero-bit encodings — a NULL without an ACN encoding pattern and an empty
+    // SEQUENCE — have no funcBody on Encode (content = None below), so the
+    // encoders never produce an icdResult and the type would silently vanish
+    // from the ICD (roadmap A1 / root cause R1): the parent CHOICE/SEQUENCE
+    // drops the row and printTasses3 never emits the standalone TAS table.
+    // Synthesize a 0-bit IcdArgAux for exactly those kinds; the funcBody
+    // results are used unchanged, so generated code is not affected.
+    let zeroBitIcdResult () : IcdArgAux option =
+        match t.Kind with
+        | Asn1AcnAst.NullType _ ->
+            let rowsFunc fieldName sPresent comments =
+                [{IcdRow.fieldName = fieldName; comments = comments@["NULL type without an ACN encoding pattern: occupies no bits on the wire"]; sPresent = sPresent; sType = IcdPlainType "NULL"; sConstraint = None; minLengthInBits = 0I; maxLengthInBits = 0I; sUnits = t.unitsOfMeasure; rowType = IcdRowType.FieldRow; idxOffset = None}], []
+            Some {IcdArgAux.canBeEmbedded = true; baseAsn1Kind = getASN1Name t; rowsFunc = rowsFunc; commentsForTas = []; scope = "type"; name = None}
+        | Asn1AcnAst.Sequence _ ->
+            let rowsFunc _ _ _ = [], []
+            Some {IcdArgAux.canBeEmbedded = false; baseAsn1Kind = getASN1Name t; rowsFunc = rowsFunc; commentsForTas = ["empty SEQUENCE (no fields): occupies no bits on the wire"]; scope = "type"; name = None}
+        | Asn1AcnAst.Integer _
+        | Asn1AcnAst.Real _
+        | Asn1AcnAst.IA5String _
+        | Asn1AcnAst.NumericString _
+        | Asn1AcnAst.OctetString _
+        | Asn1AcnAst.TimeType _
+        | Asn1AcnAst.BitString _
+        | Asn1AcnAst.Boolean _
+        | Asn1AcnAst.Enumerated _
+        | Asn1AcnAst.SequenceOf _
+        | Asn1AcnAst.Choice _
+        | Asn1AcnAst.ObjectIdentifier _
+        | Asn1AcnAst.ReferenceType _ -> None
     let func, funcDef, userDefinedFunctions, auxiliaries, icdResult, ns2  =
             match funcNameAndtasInfo  with
             | None ->
                 match ProgrammingLanguage.ActiveLanguages.Head with
                 | Scala ->
+                    // No icdResult for inline/parameterized types under Scala:
+                    // the funcBody evaluation below is not supported by the
+                    // Scala backend. An ICD generated from a Scala AST would
+                    // therefore be incomplete - Program.fs rejects -icdAcn /
+                    // -customIcdAcn / -icdRaw when Scala is the first target
+                    // language (roadmap B6).
                     None, None, [], [], None, ns
                 | _ ->
                     match r.args.generateAcnIcd with
@@ -95,8 +130,18 @@ let createAcnFunction (r: Asn1AcnAst.AstRoot)
                         let content, ns1a = funcBody ns errCode [] (NestingScope.init t.acnMaxSizeInBits t.uperMaxSizeInBits []) p
                         let icdResult, udfcs =
                             match content with
-                            | None -> None, []
-                            | Some bodyResult -> bodyResult.icdResult, bodyResult.userDefinedFunctions
+                            | None -> zeroBitIcdResult (), []
+                            | Some bodyResult ->
+                                match bodyResult.icdResult with
+                                | Some _ -> bodyResult.icdResult, bodyResult.userDefinedFunctions
+                                | None   ->
+                                    // A body without icdResult is a zero-bit encoding whose
+                                    // funcBody was synthesized by a wrapper (align-to-next
+                                    // and/or save-position around a pattern-less NULL /
+                                    // empty SEQUENCE).  Synthesize the 0-bit row here and,
+                                    // when the type is aligned, prepend the padding row the
+                                    // alignment emits (roadmap B3).
+                                    AcnAlignment.prependAlignmentPaddingRow t.acnAlignment (zeroBitIcdResult ()), bodyResult.userDefinedFunctions
                         None, None, udfcs, [], icdResult, ns1a
             | Some funcName ->
                 let precondAnnots = lm.lg.generatePrecond r ACN t codec
@@ -106,9 +151,16 @@ let createAcnFunction (r: Asn1AcnAst.AstRoot)
                     match content with
                     | None ->
                         let emptyStatement = lm.lg.emptyStatement
-                        emptyStatement, [], [], true, isValidFuncName.IsNone, [], [], None
+                        emptyStatement, [], [], true, isValidFuncName.IsNone, [], [], zeroBitIcdResult ()
                     | Some bodyResult ->
-                        bodyResult.funcBody, bodyResult.errCodes, bodyResult.localVariables, bodyResult.bBsIsUnReferenced, bodyResult.bValIsUnReferenced, bodyResult.userDefinedFunctions, bodyResult.auxiliaries, bodyResult.icdResult
+                        // Same zero-bit fallback as the inline branch above: a body
+                        // without icdResult comes from the align-to-next/save-position
+                        // wrappers around a zero-bit encoding.
+                        let icdResult =
+                            match bodyResult.icdResult with
+                            | Some _ -> bodyResult.icdResult
+                            | None   -> AcnAlignment.prependAlignmentPaddingRow t.acnAlignment (zeroBitIcdResult ())
+                        bodyResult.funcBody, bodyResult.errCodes, bodyResult.localVariables, bodyResult.bBsIsUnReferenced, bodyResult.bValIsUnReferenced, bodyResult.userDefinedFunctions, bodyResult.auxiliaries, icdResult
 
                 let handleAcnParameter (p:AcnGenericTypes.AcnParameter) =
                     let intType  = lm.typeDef.Declare_Integer ()
@@ -152,8 +204,30 @@ let createAcnFunction (r: Asn1AcnAst.AstRoot)
         match icdResult with
         | Some icdAux ->
             let foo () =
+                // Types that resolve a reference (t.inheritInfo is set on the
+                // resolved instance, never on a TAS's own type) keep the
+                // referenced TAS's name in their field rows, e.g.
+                // "OCTET STRING (Checksum)" (roadmap A4).
+                let icdAux = AcnHelpers.icdAuxAddNamedTypeSuffix (t.inheritInfo |> Option.map (fun ii -> ii.tasName)) icdAux
                 let hasAcnDefinition = t.typeAssignmentInfo.IsSome && t.acnLocation.IsSome
-                let icdTas = AcnIcd.createIcdTas r t.id icdAux td typeDefinition nMinBytesInACN nMaxBytesInACN hasAcnDefinition
+                // In --acn-v2, closure conversion turns the CONTAINING external-field
+                // size into an explicit acnParameter on the contained type's usage
+                // instance (e.g. PayloadData at PDU.payload gains a `pdu-length`
+                // parameter).  Legacy mode carries no such parameter, so it would leak
+                // into the table-identity hash and stop the byte-identical contained
+                // instance from dedup-merging with the standalone TAS table, dropping
+                // a usage site (roadmap B8).  Drop CONTAINING-size determinants from
+                // the ICD parameter list so v2 matches legacy; codegen is unaffected
+                // (this touches ICD content only).  No-op in legacy mode.
+                let icdAcnParameters =
+                    match r.args.acnDeferred with
+                    | false -> t.acnParameters
+                    | true  ->
+                        t.acnParameters |> List.filter (fun prm ->
+                            not (deps.acnDependencies |> List.exists (fun d ->
+                                d.determinant.id = prm.id &&
+                                (match d.dependencyKind with AcnDepSizeDeterminant_bit_oct_str_contain _ -> true | _ -> false))))
+                let icdTas = AcnIcd.createIcdTas r t.id icdAux td typeDefinition nMinBytesInACN nMaxBytesInACN hasAcnDefinition icdAcnParameters
                 let ns3 =
                     match ns2.icdHashes.TryFind icdTas.hash with
                     | None -> {ns2 with icdHashes = ns2.icdHashes.Add(icdTas.hash, [icdTas])}

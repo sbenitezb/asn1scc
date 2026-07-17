@@ -32,6 +32,7 @@ type CliArguments =
     | [<Unique; AltCommandLine("-customIcdUper")>] CustomIcdUper  of custom_stg_colon_out_filename:string
     | [<Unique; AltCommandLine("-icdAcn")>] IcdAcn  of acn_icd_output_file:string
     | [<Unique; AltCommandLine("-customIcdAcn")>] CustomIcdAcn  of custom_stg_colon_out_filename:string
+    | [<Unique; AltCommandLine("-icdRaw")>] IcdRaw  of acn_icd_raw_json_output_file:string
     | [<Unique; AltCommandLine("-icdPdus")>] IcdPdus  of asn1_type_assignments_list:string
     | [<Unique; AltCommandLine("-dpdus")>] DetectPdus
     | [<Unique; AltCommandLine("-AdaUses")>] AdaUses
@@ -103,6 +104,7 @@ E.g., -eee 50 will enable this mode for enumerated types with 50 or more enumera
             | CustomIcdUper  _  -> "Invokes the custom stg file 'stgFile.stg' using the icdUper backend and produces the output file 'outputFile'"
             | IcdAcn  _         -> "Produces an Interface Control Document for the input ASN.1 and ACN grammars for ACN encoding"
             | CustomIcdAcn  _   -> "Invokes the custom stg file 'stgFile.stg' using the icdAcn backend and produces the output file 'outputFile'"
+            | IcdRaw  _         -> "Serializes the ACN Interface Control Document model to a machine-readable JSON file (deterministic output, intended for testing and external tooling). The output file must have a .json extension."
             | DetectPdus        -> "Automatically detects the Protocol Data Units (PDUs) in the input ASN.1 grammar and prints them to the console. PDUs are defined as top-level types, i.e., types that are not referenced by any other type."
             | IcdPdus       _   -> "A comma-separated list of top-level type assignments (PDUs). Only these types and their transitive dependencies will have encode/decode functions generated. Also limits ICD output to the listed types. Enclose in double quotes if multiple, e.g. -icdPdus \"TypeA,TypeB\"."
             | AdaUses           -> "Prints in the console all type Assignments of the input ASN.1 grammar"
@@ -126,7 +128,7 @@ let printVersion () =
     //let fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(assembly.Location);
     //let version = fvi.FileVersion;
 
-    let version = "4.7.2.0"
+    let version = "4.8.1.0"
     printfn "asn1scc version %s\n" version
     ()
 
@@ -206,6 +208,20 @@ let allMacros = [ (C, c_macro); (Scala, scala_macro); (Ada, ada_macro)]
 let getLanguageMacro (l:ProgrammingLanguage) =
     allMacros |> List.filter(fun (lang,_) -> lang = l) |> List.head |> snd
 
+// The ACN ICD (-icdAcn / -customIcdAcn / -icdRaw) cannot be generated when the
+// Scala backend is among the target languages: Scala does not provide the ICD
+// information for inline and parameterized types (AcnFunctionWrapper skips
+// icdResult when the active language is Scala, and evaluating the Scala
+// funcBody for ICD purposes is not supported), so a Scala-first run would
+// silently produce an incomplete document and a C/Ada-first run crashes while
+// building the Scala backend AST with ICD generation enabled. Reject the
+// combination with a clear error instead (roadmap B6 of the ICD analysis).
+let checkAcnIcdNotWithScala (cliArgs : CliArguments list) cmdoption =
+    match cliArgs |> List.exists (fun a -> a = Scala_Lang) with
+    | true  ->
+        raise (UserException (sprintf "The %s option is not supported for the Scala backend: Scala does not provide the ICD information for inline or parameterized types. Generate the ICD in a separate run using the C or Ada backend (the wire format is the same), or drop %s." cmdoption cmdoption))
+    | false -> ()
+
 let checkArgument (cliArgs : CliArguments list) arg =
     match arg with
     | Version          -> ()
@@ -256,8 +272,15 @@ let checkArgument (cliArgs : CliArguments list) arg =
     | Slim -> ()
     | IcdUper  outHtmlFile      -> checkOutFileName outHtmlFile ".html" "-icdUper"
     | CustomIcdUper  comFile    -> checkCompositeFile comFile "-customIcdUper" ".html"
-    | IcdAcn  outHtmlFile       -> checkOutFileName outHtmlFile ".html" "-icdAcn"
-    | CustomIcdAcn  comFile     -> checkCompositeFile comFile "-customIcdAcn" ".html"
+    | IcdAcn  outHtmlFile       ->
+        checkOutFileName outHtmlFile ".html" "-icdAcn"
+        checkAcnIcdNotWithScala cliArgs "-icdAcn"
+    | CustomIcdAcn  comFile     ->
+        checkCompositeFile comFile "-customIcdAcn" ".html"
+        checkAcnIcdNotWithScala cliArgs "-customIcdAcn"
+    | IcdRaw  outJsonFile       ->
+        checkOutFileName outJsonFile ".json" "-icdRaw"
+        checkAcnIcdNotWithScala cliArgs "-icdRaw"
     | IcdPdus _                 -> ()
     | DetectPdus                -> ()
     | AdaUses                   -> ()
@@ -327,8 +350,8 @@ let constructCommandLineSettings args (parserResults: ParseResults<CliArguments>
         AstXmlAbsFileName = parserResults.GetResult(<@Xml_Ast@>, defaultValue = "")
         //IcdUperHtmlFileName = ""
         //IcdAcnHtmlFileName = ""
-        generateAcnIcd = 
-            parserResults.Contains <@ IcdAcn @> || parserResults.Contains <@ CustomIcdAcn @>
+        generateAcnIcd =
+            parserResults.Contains <@ IcdAcn @> || parserResults.Contains <@ CustomIcdAcn @> || parserResults.Contains <@ IcdRaw @>
         generateConstInitGlobals = parserResults.Contains(<@Init_Globals@>)
         custom_Stg_Ast_Version = parserResults.GetResult(<@ Custom_Stg_Ast_Version @>, defaultValue = 1)
         icdPdus = 
@@ -532,6 +555,7 @@ let main0 argv =
                         | Some(stgFile, outFile)  -> GenerateUperIcd.DoWork r stgFile outFile
                         | None  -> ()
                     | IcdAcn outFile       -> GenerateAcnIcd.DoWork r  acnDeps "icdtemplate_acn.stg"  (Some "icdtemplate_uper.stg") outFile
+                    | IcdRaw outFile       -> GenerateAcnIcd.DoWorkIcdRawJson r outFile
                     | CustomIcdAcn comFile ->
                         match getCustmStgFileNames comFile with
                         | Some(stgFile, outFile)  ->

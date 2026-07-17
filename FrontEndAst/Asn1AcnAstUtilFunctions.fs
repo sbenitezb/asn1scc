@@ -451,6 +451,7 @@ let getRealEncodingClass (bSlim:bool) (acnEncodingClass:RealEncodingClass) =
         | Real_IEEE754_64_big_endian        -> ASN1SCC_FP64
         | Real_IEEE754_32_little_endian     -> ASN1SCC_FP32
         | Real_IEEE754_64_little_endian     -> ASN1SCC_FP64
+        | Real_ScaledInt _                  -> ASN1SCC_REAL
     | false -> ASN1SCC_REAL
 
 type Real             with
@@ -683,3 +684,41 @@ type Asn1Type with
             match tas.Type.inheritInfo with
             | None  -> Some tas.Type
             | Some _ -> tas.Type.getBaseType r
+
+// ///////////////////////////////////////////////////////////////////////////
+// 'size deduced' helpers (Docs/deduced-size-spec.md)
+// ///////////////////////////////////////////////////////////////////////////
+
+//the type itself carries the 'size deduced' ACN property
+let rec isSelfDeduced (t:Asn1Type) =
+    match t.Kind with
+    | IA5String s
+    | NumericString s ->
+        match s.acnEncodingClass with
+        | Acn_Enc_String_Ascii_Deduced _ -> true
+        | _                              -> false
+    | OctetString o     -> o.acnEncodingClass = SZ_EC_Deduced
+    | BitString o       -> o.acnEncodingClass = SZ_EC_Deduced
+    | SequenceOf o      -> o.acnEncodingClass = SZ_EC_Deduced
+    | ReferenceType rf  ->
+        match rf.encodingOptions with
+        | Some eo -> eo.acnEncodingClass = SZ_EC_Deduced
+        | None    -> false
+    | _ -> false
+
+//true when decoding the type consumes "the rest of the enclosing decoding region",
+//i.e. it is deduced itself or contains a deduced descendant that is not isolated
+//behind a CONTAINING boundary
+and isLiveDeduced (t:Asn1Type) =
+    match isSelfDeduced t with
+    | true  -> true
+    | false ->
+        match t.Kind with
+        | Sequence sq       -> sq.children |> List.exists(fun c -> match c with Asn1Child a -> isLiveDeduced a.Type | AcnChild _ -> false)
+        | Choice ch         -> ch.children |> List.exists(fun c -> isLiveDeduced c.Type)
+        | SequenceOf sqf    -> isLiveDeduced sqf.child
+        | ReferenceType rf  ->
+            match rf.encodingOptions with
+            | Some _    -> false        //CONTAINING boundary: the container size delimits the region
+            | None      -> isLiveDeduced rf.resolvedType
+        | _ -> false

@@ -142,7 +142,11 @@ let _createAcnEncDecFunction (r:Asn1AcnAst.AstRoot) (lm:LanguageMacros) (t:Asn1A
     let printCodec_body_header      = lm.atc.PrintCodec_spec
     let joinItems                   = lm.atc.JoinItems
     let encode                      = lm.atc.Codec_Encode
-    let decode                      = lm.atc.Codec_Decode
+    //'size deduced' PDUs must be decoded from a bitstream attached to exactly
+    //the encoded length (Docs/deduced-size-spec.md par.9/par.10)
+    let decode                      = match isLiveDeduced t with
+                                      | true  -> lm.atc.Codec_Decode_exact_length
+                                      | false -> lm.atc.Codec_Decode
     let validateOutput              = lm.atc.Codec_validate_output
     let compareInputWithOutput      = lm.atc.Codec_compare_input_with_output
     let write_bitstreamToFile       = lm.atc.Codec_write_bitstreamToFile
@@ -384,6 +388,9 @@ let RealAutomaticTestCaseValues (r:Asn1AcnAst.AstRoot)  (t:Asn1AcnAst.Asn1Type) 
             | Real_IEEE754_64_big_endian          -> Double.MinValue, Double.MaxValue
             | Real_IEEE754_32_little_endian       -> (double Single.MinValue), (double Single.MaxValue)
             | Real_IEEE754_64_little_endian       -> Double.MinValue, Double.MaxValue
+            //scaled-integer encoding requires a closed range constraint, so the fold below
+            //always narrows these defaults to the constraint bounds (which round-trip exactly)
+            | Real_ScaledInt _                    -> Double.MinValue, Double.MaxValue
 
 
     match allCons with

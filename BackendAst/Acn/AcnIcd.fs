@@ -8,8 +8,18 @@ open DAst
 open DAstUtilFunctions
 
 
-let createIcdTas (r:Asn1AcnAst.AstRoot) (id:ReferenceToType) (icdAux:IcdArgAux) (td:FE_TypeDefinition) (typeDefinition:TypeDefinitionOrReference) nMinBytesInACN nMaxBytesInACN hasAcnDefinition =
+let createIcdTas (r:Asn1AcnAst.AstRoot) (id:ReferenceToType) (icdAux:IcdArgAux) (td:FE_TypeDefinition) (typeDefinition:TypeDefinitionOrReference) nMinBytesInACN nMaxBytesInACN hasAcnDefinition (acnParameters:AcnGenericTypes.AcnParameter list) =
     let icdRows, compositeChildren = icdAux.rowsFunc "" "" [];
+    let icdAcnParameters =
+        acnParameters |>
+        List.map(fun p ->
+            let prmType =
+                match p.asn1Type with
+                | AcnGenericTypes.AcnParamType.AcnPrmInteger  _      -> IcdPrmBasic "INTEGER"
+                | AcnGenericTypes.AcnParamType.AcnPrmBoolean  _      -> IcdPrmBasic "BOOLEAN"
+                | AcnGenericTypes.AcnParamType.AcnPrmNullType _      -> IcdPrmBasic "NULL"
+                | AcnGenericTypes.AcnParamType.AcnPrmRefType (md,ts) -> IcdPrmRefTas (md.Value, ts.Value)
+            {IcdAcnParameter.name = p.name; prmType = prmType})
     let icdTas =
         {
             IcdTypeAss.typeId = id
@@ -33,6 +43,7 @@ let createIcdTas (r:Asn1AcnAst.AstRoot) (id:ReferenceToType) (icdAux:IcdArgAux) 
                         | Some ts -> ts.Comments |> Seq.toList
 
                 asn1Comments@icdAux.commentsForTas
+            acnParameters = icdAcnParameters
             rows  = icdRows
             compositeChildren = compositeChildren
             minLengthInBytes = nMinBytesInACN;

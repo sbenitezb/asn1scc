@@ -119,6 +119,9 @@ let constructAst_int (args:CommandLineSettings) (lms:(ProgrammingLanguage*Langua
             TL "CheckLongReferences.checkAst" (fun () ->
                 CheckLongReferences.checkAst acnAst)
 
+        TL "CheckLongReferences.checkDeducedSizePlacement" (fun () ->
+            CheckLongReferences.checkDeducedSizePlacement acnAst)
+
         // When acnDeferred is enabled, transform implicit cross-scope ACN references
         // into explicit acnParameters/acnArguments (closure conversion) and rewrite
         // deps so that resolveParam stops at the new parameter level.

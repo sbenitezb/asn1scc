@@ -1,0 +1,20 @@
+TEST-CASE DEFINITIONS AUTOMATIC TAGS::= BEGIN
+
+    MyInt ::= INTEGER (0..16383)
+
+    TLVList ::= SEQUENCE (SIZE(0..100)) OF MyInt
+
+    MyPDU ::= SEQUENCE {
+        hdr   INTEGER (0..255),
+        items TLVList,
+        crc   INTEGER (0..4294967295)
+    }
+
+    lst1 TLVList ::= { 1, 2, 3 }
+    lst2 TLVList ::= { }
+    pdu1 MyPDU ::= { hdr 7, items { 100, 200, 300, 400, 500 }, crc 123456789 }
+END
+
+--TCLS   MyInt [encoding pos-int, size 16] TLVList [size deduced]
+--TCLS   MyInt [encoding pos-int, size 16] TLVList [size deduced] MyPDU [] { hdr [encoding pos-int, size 8], items [], crc [encoding pos-int, size 32] }
+--TCLFC  MyInt [encoding pos-int, size 16] TLVList [size deduced, termination-pattern 'FFFF'H]  $$$ sample1.acn:4:78: error: 'termination-pattern' requires 'size null-terminated'

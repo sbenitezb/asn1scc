@@ -53,6 +53,7 @@ let private getIntSizeProperty  errLoc (props:GenericAcnProperty list) =
                     raise(SemanticError(bitPattern.Location, "termination-pattern cannot exceed 10 bytes"))
                 Some(AcnGenericTypes.IntNullTerminated ba)
         | None      -> Some(AcnGenericTypes.IntNullTerminated ([byte 0]))
+    | Some (GP_Deduced          )   -> raise(SemanticError(errLoc ,"'size deduced' is not applicable to this type"))
     | Some (GP_SizeDeterminant _)   -> raise(SemanticError(errLoc ,"Expecting an Integer value or an ACN constant as value for the size property"))
 
 let private getStringSizeProperty (minSize:BigInteger) (maxSize:BigInteger) errLoc (props:GenericAcnProperty list) =
@@ -78,6 +79,13 @@ let private getStringSizeProperty (minSize:BigInteger) (maxSize:BigInteger) errL
                     raise(SemanticError(bitPattern.Location, "termination-pattern cannot exceed 10 bytes"))
                 Some(AcnGenericTypes.StrNullTerminated ba)
         | None      -> Some(AcnGenericTypes.StrNullTerminated ([byte 0]))
+    | Some (GP_Deduced          )   ->
+        match tryGetProp props (fun x -> match x with TERMINATION_PATTERN e -> Some e | _ -> None) with
+        | Some b    -> raise(SemanticError(b.Location, "'termination-pattern' requires 'size null-terminated'"))
+        | None      ->
+            match minSize = maxSize with
+            | true  -> raise(SemanticError(errLoc, "'size deduced' is pointless for a fixed-size type; remove the size property"))
+            | false -> Some AcnGenericTypes.StrDeduced
     | Some (GP_SizeDeterminant fld)   -> (Some (AcnGenericTypes.StrExternalField fld))
 
 let private getSizeableSizeProperty (minSize:BigInteger) (maxSize:BigInteger) errLoc (props:GenericAcnProperty list) =
@@ -97,6 +105,13 @@ let private getSizeableSizeProperty (minSize:BigInteger) (maxSize:BigInteger) er
         match tryGetProp props (fun x -> match x with TERMINATION_PATTERN e -> Some e | _ -> None) with
         | Some b    -> Some(AcnGenericTypes.SzNullTerminated b)
         | None      -> raise(SemanticError(errLoc , (sprintf "No 'termination-pattern' was provided")))
+    | Some (GP_Deduced          )   ->
+        match tryGetProp props (fun x -> match x with TERMINATION_PATTERN e -> Some e | _ -> None) with
+        | Some b    -> raise(SemanticError(b.Location, "'termination-pattern' requires 'size null-terminated'"))
+        | None      ->
+            match minSize = maxSize with
+            | true  -> raise(SemanticError(errLoc, "'size deduced' is pointless for a fixed-size type; remove the size property"))
+            | false -> Some AcnGenericTypes.SzDeduced
 
 let private getIntEncodingProperty errLoc (props:GenericAcnProperty list) =
     match tryGetProp props (fun x -> match x with ENCODING e -> Some e | _ -> None) with
@@ -130,10 +145,10 @@ let private getPreDecodingFunction  (props:GenericAcnProperty list) =
 let private getRealEncodingProperty errLoc (props:GenericAcnProperty list) =
     match tryGetProp props (fun x -> match x with ENCODING e -> Some e | _ -> None) with
     | None  -> None
-    | Some (GP_PosInt         )
-    | Some (GP_TwosComplement )
     | Some (GP_Ascii          )
-    | Some (GP_BCD            ) ->  raise(SemanticError(errLoc ,"Invalid encoding property value. Expecting 'IEEE754-1985-32' or 'IEEE754-1985-64'"))
+    | Some (GP_BCD            ) ->  raise(SemanticError(errLoc ,"Invalid encoding property value. Expecting 'IEEE754-1985-32', 'IEEE754-1985-64', 'pos-int' or 'twos-complement'"))
+    | Some (GP_PosInt         ) ->  Some (AcnGenericTypes.Real_PosInt)
+    | Some (GP_TwosComplement ) ->  Some (AcnGenericTypes.Real_TwosComplement)
     | Some (GP_IEEE754_32     ) ->  Some (AcnGenericTypes.IEEE754_32)
     | Some (GP_IEEE754_64     ) ->  Some (AcnGenericTypes.IEEE754_64)
 
@@ -317,7 +332,7 @@ let private mergeReal (asn1: Asn1Ast.AstRoot) (lms:(ProgrammingLanguage*Language
     props |>
     Seq.iter(fun pr ->
         match pr with
-        | SIZE  _   -> raise(SemanticError(acnErrLoc0, "Acn property 'size' cannot be applied to REAL types"))
+        | MAPPING_FUNCTION _   -> raise(SemanticError(acnErrLoc0, "Acn property 'mapping-function' cannot be applied to REAL types"))
         | _         -> ())
 
     let acnProperties =
@@ -326,17 +341,29 @@ let private mergeReal (asn1: Asn1Ast.AstRoot) (lms:(ProgrammingLanguage*Language
             {
                 RealAcnProperties.encodingProp    = getRealEncodingProperty acnErrLoc props
                 endiannessProp                    = getEndiannessProperty props
+                sizeProp                          = getIntSizeProperty acnErrLoc props
             }
-        | None  -> {RealAcnProperties.encodingProp = None; endiannessProp = None }
+        | None  -> {RealAcnProperties.encodingProp = None; endiannessProp = None; sizeProp = None }
     let uperRange    = uPER.getRealTypeConstraintUperRange cons loc
     let uperMaxSizeInBits=(5I+asn1.args.integerSizeInBytes)*8I
     let uperMinSizeInBits=8I
     let alignment = tryGetProp props (fun x -> match x with ALIGNTONEXT e -> Some e | _ -> None)
-    let acnEncodingClass,  acnMinSizeInBits, acnMaxSizeInBits= AcnEncodingClasses.GetRealEncodingClass alignment loc acnProperties uperMinSizeInBits uperMaxSizeInBits
+    let acnEncodingClass,  acnMinSizeInBits, acnMaxSizeInBits= AcnEncodingClasses.GetRealEncodingClass asn1.args.integerSizeInBytes alignment acnErrLoc0 acnProperties uperMinSizeInBits uperMaxSizeInBits
     match acnEncodingClass with
     | Real_IEEE754_64_big_endian        when asn1.args.floatingPointSizeInBytes = 4I -> raise(SemanticError(acnErrLoc0, "Acn property 'IEEE754-1985-64' cannot be applied when -fpWordSize  4"))
     | Real_IEEE754_64_little_endian     when asn1.args.floatingPointSizeInBytes = 4I -> raise(SemanticError(acnErrLoc0, "Acn property 'IEEE754-1985-64' cannot be applied when -fpWordSize  4"))
-    | _                                                                              -> ()
+    | Real_ScaledInt _ ->
+        //the scaled-integer encoding maps the REAL range [a,b] linearly onto the integer range,
+        //so a closed, non-degenerate range constraint is mandatory
+        (match uperRange with
+         | Concrete (a, b) when a < b -> ()
+         | Concrete _                 -> raise(SemanticError(acnErrLoc0, "REAL types encoded as 'pos-int' or 'twos-complement' must have a range constraint (a..b) with a < b"))
+         | NegInf _ | PosInf _ | Full -> raise(SemanticError(acnErrLoc0, "REAL types encoded as 'pos-int' or 'twos-complement' must have a closed range constraint (a..b)")))
+        (match lms |> List.exists(fun (l,_) -> l = Scala) with
+         | true  -> raise(SemanticError(acnErrLoc0, "The 'pos-int' and 'twos-complement' encodings of REAL types are not supported for Scala"))
+         | false -> ())
+    | Real_uPER | Real_IEEE754_32_big_endian | Real_IEEE754_32_little_endian
+    | Real_IEEE754_64_big_endian | Real_IEEE754_64_little_endian                     -> ()
     let typeDef, us1 = getPrimitiveTypeDefinition {tdarg with rtlFnc = Some getRtlTypeName} us
     let definitionOrRef = 
         lms |> List.map(fun (l,lm) ->
@@ -460,6 +487,7 @@ let private mergeStringType (asn1: Asn1Ast.AstRoot) (lms:(ProgrammingLanguage*La
         | None   -> ()
     | Acn_Enc_String_Ascii_External_Field_Determinant       (_,relativePath) -> ()
     | Acn_Enc_String_CharIndex_External_Field_Determinant   (_,relativePath) -> ()
+    | Acn_Enc_String_Ascii_Deduced                           _                -> ()
 
     let typeDef, us1 =
         match tdarg with
@@ -516,6 +544,7 @@ let private mergeOctetStringType (asn1: Asn1Ast.AstRoot)
         match p with
         | SzExternalField f -> Some f
         | SzNullTerminated _ -> None
+        | SzDeduced          -> None
     )
     let acnArgsSubsted = substAcnArgs acnParamSubst (sizeDetArg |> Option.toList)
 
@@ -568,6 +597,7 @@ let private mergeBitStringType (asn1:Asn1Ast.AstRoot)
         match p with
         | SzExternalField f -> Some f
         | SzNullTerminated _ -> None
+        | SzDeduced          -> None
     )
     let acnArgsSubsted = substAcnArgs acnParamSubst (sizeDetArg |> Option.toList)
 
@@ -1185,7 +1215,7 @@ let rec private mergeType  (asn1:Asn1Ast.AstRoot) (acn:AcnAst) (typeIdsSet : Map
             let uperMinSizeInBits, _ = uPER.getSizeableTypeSize minSize.uper maxSize.uper newChType.uperMinSizeInBits
             let _, uperMaxSizeInBits = uPER.getSizeableTypeSize minSize.uper maxSize.uper newChType.uperMaxSizeInBits
 
-            let acnEncodingClass,  acnMinSizeInBits, acnMaxSizeInBits= AcnEncodingClasses.GetSequenceOfEncodingClass alignment loc acnProperties uperMinSizeInBits uperMaxSizeInBits minSize.acn maxSize.acn newChType.acnMinSizeInBits newChType.acnMaxSizeInBits hasNCount
+            let acnEncodingClass,  acnMinSizeInBits, acnMaxSizeInBits= AcnEncodingClasses.GetSequenceOfEncodingClass alignment t.Location acnProperties uperMinSizeInBits uperMaxSizeInBits minSize.acn maxSize.acn newChType.acnMinSizeInBits newChType.acnMaxSizeInBits hasNCount
             //   (acnAlignment : AcnGenericTypes.AcnAlignment option) (child : Asn1AcnAst.Asn1Type) (childType: DAst.Asn1Type)
             let maxAlignment = maxAlignmentOf [alignment; newChType.maxAlignment]
 
@@ -1529,13 +1559,29 @@ let rec private mergeType  (asn1:Asn1Ast.AstRoot) (acn:AcnAst) (typeIdsSet : Map
                 match acnTypeAssign with
                 | None      -> None
                 | Some x    -> Some x.typeEncodingSpec
+            let acnTypeForMerge =
+                //'size deduced' + CONTAINING: the size/termination-pattern properties of the
+                //reference describe the octet/bit string CONTAINER, not the contained type.
+                //When the contained type is 'size deduced' they must not leak into the
+                //contained type's encoding spec (they would override 'size deduced' and turn
+                //the contained sizeable type into an external-field one, see
+                //Docs/deduced-size-spec.md).  For non-deduced contained types the legacy
+                //merging behaviour is preserved.
+                let baseIsDeduced =
+                    match baseTypeAcnEncSpec with
+                    | Some baseSpec -> baseSpec.acnProperties |> List.exists(fun p -> match p with SIZE GP_Deduced -> true | _ -> false)
+                    | None          -> false
+                match rf.refEnc, acnType with
+                | Some _, Some ts when baseIsDeduced ->
+                    Some {ts with acnProperties = ts.acnProperties |> List.filter(fun p -> match p with SIZE _ | TERMINATION_PATTERN _ -> false | _ -> true)}
+                | _ -> acnType
             let mergedAcnEncSpec =
                 //if a reference type has a component constraint (i.e. it is actually a SEQUENCE, CHOICE or SEQUENCE OF) then we should not merge the ACN spec
                 //We must take the the ACN specification only from this type and not the base type. The reason is that with the WITH COMPONENTS constraints you can
                 //change the definition of the type (i.e. make child as always absent).
                 match t.Constraints@refTypeCons |> Seq.exists(fun c -> match c with Asn1Ast.WithComponentConstraint _ -> true | Asn1Ast.WithComponentsConstraint _ -> true | _ -> false) with
-                | true  -> acnType
-                | false -> mergeAcnEncodingSpecs acnType baseTypeAcnEncSpec
+                | true  -> acnTypeForMerge
+                | false -> mergeAcnEncodingSpecs acnTypeForMerge baseTypeAcnEncSpec
             let hasAdditionalConstraints = restCons.Length > 0 || withCompCons.Length > 0
             let inheritanceInfo = (Some {InheritanceInfo.modName = rf.modName.Value; tasName = rf.tasName.Value; hasAdditionalConstraints=hasAdditionalConstraints})
 
@@ -1593,7 +1639,7 @@ let rec private mergeType  (asn1:Asn1Ast.AstRoot) (acn:AcnAst) (typeIdsSet : Map
                         | Some acnErrLoc    -> { SizeableAcnProperties.sizeProp  = getSizeableSizeProperty minSize.acn maxSize.acn acnErrLoc combinedProperties}
                         | None              -> {SizeableAcnProperties.sizeProp = None }
 
-                    let acnEncodingClass,  acnMinSizeInBits, acnMaxSizeInBits= AcnEncodingClasses.GetBitStringEncodingClass alignment loc acnProperties uperMinSizeInBits uperMaxSizeInBits minSize.acn maxSize.acn hasNCount
+                    let acnEncodingClass,  acnMinSizeInBits, acnMaxSizeInBits= AcnEncodingClasses.GetBitStringEncodingClass alignment t.Location acnProperties uperMinSizeInBits uperMaxSizeInBits minSize.acn maxSize.acn hasNCount
 
                     uperMinSizeInBits, uperMaxSizeInBits, acnMinSizeInBits, acnMaxSizeInBits, (Some  {EncodeWithinOctetOrBitStringProperties.acnEncodingClass = acnEncodingClass; octOrBitStr = ContainedInBitString; minSize = minSize; maxSize=maxSize})
                 | Some  ContainedInOctString  ->
@@ -1607,7 +1653,7 @@ let rec private mergeType  (asn1:Asn1Ast.AstRoot) (acn:AcnAst) (typeIdsSet : Map
                         | Some acnErrLoc    -> {SizeableAcnProperties.sizeProp = getSizeableSizeProperty minSize.acn maxSize.acn acnErrLoc combinedProperties}
                         | None              -> {SizeableAcnProperties.sizeProp = None}
 
-                    let acnEncodingClass,  acnMinSizeInBits, acnMaxSizeInBits= AcnEncodingClasses.GetOctetStringEncodingClass alignment loc acnProperties uperMinSizeInBits uperMaxSizeInBits minSize.acn maxSize.acn hasNCount
+                    let acnEncodingClass,  acnMinSizeInBits, acnMaxSizeInBits= AcnEncodingClasses.GetOctetStringEncodingClass alignment t.Location acnProperties uperMinSizeInBits uperMaxSizeInBits minSize.acn maxSize.acn hasNCount
 
                     uperMinSizeInBits, uperMaxSizeInBits, acnMinSizeInBits, acnMaxSizeInBits, (Some  {EncodeWithinOctetOrBitStringProperties.acnEncodingClass = acnEncodingClass; octOrBitStr = ContainedInOctString; minSize = minSize; maxSize=maxSize})
 

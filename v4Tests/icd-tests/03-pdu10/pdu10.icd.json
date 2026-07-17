@@ -1,0 +1,452 @@
+{
+  "navOrder": [
+    "PDU-LENGTH-TYPE@MyModule.PDU-LENGTH-TYPE",
+    "BUFFER-LENGTH-TYPE@MyModule.BUFFER-LENGTH-TYPE",
+    "PDU@MyModule.PDU",
+    "Header@MyModule.PDU.hdr",
+    "MyModule-PDU-payload_OCT_STR@MyModule.PDU.payload",
+    "Header@MyModule.Header",
+    "PayloadData@MyModule.PayloadData"
+  ],
+  "tables": [
+    {
+      "id": "PDU-LENGTH-TYPE@MyModule.PDU-LENGTH-TYPE",
+      "name": "PDU-LENGTH-TYPE",
+      "kind": "INTEGER",
+      "tasInfo": {
+        "modName": "MyModule",
+        "tasName": "PDU-LENGTH-TYPE"
+      },
+      "module": "MyModule",
+      "usagePath": "MyModule.PDU-LENGTH-TYPE",
+      "usageSites": [
+        "MyModule.PDU-LENGTH-TYPE"
+      ],
+      "hasAcnDefinition": false,
+      "minLengthInBytes": 2,
+      "maxLengthInBytes": 2,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(0 .. 65535)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "BUFFER-LENGTH-TYPE@MyModule.BUFFER-LENGTH-TYPE",
+      "name": "BUFFER-LENGTH-TYPE",
+      "kind": "INTEGER",
+      "tasInfo": {
+        "modName": "MyModule",
+        "tasName": "BUFFER-LENGTH-TYPE"
+      },
+      "module": "MyModule",
+      "usagePath": "MyModule.BUFFER-LENGTH-TYPE",
+      "usageSites": [
+        "MyModule.BUFFER-LENGTH-TYPE"
+      ],
+      "hasAcnDefinition": false,
+      "minLengthInBytes": 1,
+      "maxLengthInBytes": 1,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(0 .. 100)",
+          "minLengthInBits": 7,
+          "maxLengthInBits": 7,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PDU@MyModule.PDU",
+      "name": "PDU",
+      "kind": "SEQUENCE",
+      "tasInfo": {
+        "modName": "MyModule",
+        "tasName": "PDU"
+      },
+      "module": "MyModule",
+      "usagePath": "MyModule.PDU",
+      "usageSites": [
+        "MyModule.PDU"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 8,
+      "maxLengthInBytes": 208,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "hdr",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "reference",
+            "id": "Header@MyModule.PDU.hdr"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "payload",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "reference",
+            "id": "MyModule-PDU-payload_OCT_STR@MyModule.PDU.payload"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 32,
+          "maxLengthInBits": 1632,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 32,
+            "maxBits": 32,
+            "display": "32"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Header@MyModule.PDU.hdr",
+      "name": "Header (as PDU.hdr)",
+      "kind": "SEQUENCE",
+      "tasInfo": null,
+      "module": "MyModule",
+      "usagePath": "MyModule.PDU.hdr",
+      "usageSites": [
+        "MyModule.PDU.hdr"
+      ],
+      "hasAcnDefinition": false,
+      "minLengthInBytes": 4,
+      "maxLengthInBytes": 4,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "version",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "fixed pattern:  '01'H"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "pdu-length",
+          "comments": [
+            "size determinant for MyModule.PDU.payload "
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (PDU-LENGTH-TYPE)"
+          },
+          "sConstraint": "(0 .. 65535)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 8,
+            "maxBits": 8,
+            "display": "8"
+          }
+        },
+        {
+          "idxOffset": 3,
+          "fieldName": "buffers-length",
+          "comments": [
+            "reference determinant for MyModule.PDU.payload.buffer-len "
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (BUFFER-LENGTH-TYPE)"
+          },
+          "sConstraint": "(0 .. 100)",
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 24,
+            "maxBits": 24,
+            "display": "24"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MyModule-PDU-payload_OCT_STR@MyModule.PDU.payload",
+      "name": "MyModule-PDU-payload_OCT_STR",
+      "kind": "SEQUENCE",
+      "tasInfo": null,
+      "module": "MyModule",
+      "usagePath": "MyModule.PDU.payload",
+      "usageSites": [
+        "MyModule.PDU.payload"
+      ],
+      "hasAcnDefinition": false,
+      "minLengthInBytes": 4,
+      "maxLengthInBytes": 204,
+      "comments": [
+        "OCTET STRING containing the encoding of PayloadData",
+        "Size in bytes is given by the external field hdr.pdu-length"
+      ],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "int-field",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(-2147483648 .. 2147483647)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "buffer1",
+          "comments": [
+            "Length is determined by the external field: buffer-len"
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "OCTET STRING"
+          },
+          "sConstraint": "(0 .. 100)",
+          "minLengthInBits": 0,
+          "maxLengthInBits": 800,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 32,
+            "maxBits": 32,
+            "display": "32"
+          }
+        },
+        {
+          "idxOffset": 3,
+          "fieldName": "buffer2",
+          "comments": [
+            "Length is determined by the external field: buffer-len"
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "OCTET STRING"
+          },
+          "sConstraint": "(0 .. 100)",
+          "minLengthInBits": 0,
+          "maxLengthInBits": 800,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 32,
+            "maxBits": 832,
+            "display": "32..832"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Header@MyModule.Header",
+      "name": "Header",
+      "kind": "SEQUENCE",
+      "tasInfo": {
+        "modName": "MyModule",
+        "tasName": "Header"
+      },
+      "module": "MyModule",
+      "usagePath": "MyModule.Header",
+      "usageSites": [
+        "MyModule.Header"
+      ],
+      "hasAcnDefinition": false,
+      "minLengthInBytes": 0,
+      "maxLengthInBytes": 0,
+      "comments": [
+        "empty SEQUENCE (no fields): occupies no bits on the wire"
+      ],
+      "acnParameters": [],
+      "rows": []
+    },
+    {
+      "id": "PayloadData@MyModule.PayloadData",
+      "name": "PayloadData",
+      "kind": "SEQUENCE",
+      "tasInfo": {
+        "modName": "MyModule",
+        "tasName": "PayloadData"
+      },
+      "module": "MyModule",
+      "usagePath": "MyModule.PayloadData",
+      "usageSites": [
+        "MyModule.PDU.payload",
+        "MyModule.PayloadData"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 4,
+      "maxLengthInBytes": 204,
+      "comments": [],
+      "acnParameters": [
+        {
+          "name": "buffer-len",
+          "type": {
+            "kind": "reference",
+            "id": "BUFFER-LENGTH-TYPE@MyModule.BUFFER-LENGTH-TYPE"
+          }
+        }
+      ],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "int-field",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(-2147483648 .. 2147483647)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "buffer1",
+          "comments": [
+            "Length is determined by the external field: buffer-len"
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "OCTET STRING"
+          },
+          "sConstraint": "(0 .. 100)",
+          "minLengthInBits": 0,
+          "maxLengthInBits": 800,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 32,
+            "maxBits": 32,
+            "display": "32"
+          }
+        },
+        {
+          "idxOffset": 3,
+          "fieldName": "buffer2",
+          "comments": [
+            "Length is determined by the external field: buffer-len"
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "OCTET STRING"
+          },
+          "sConstraint": "(0 .. 100)",
+          "minLengthInBits": 0,
+          "maxLengthInBits": 800,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 32,
+            "maxBits": 832,
+            "display": "32..832"
+          }
+        }
+      ]
+    }
+  ]
+}

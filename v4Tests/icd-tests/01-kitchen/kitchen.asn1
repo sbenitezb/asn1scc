@@ -1,0 +1,57 @@
+KITCHEN-SINK DEFINITIONS AUTOMATIC TAGS ::= BEGIN
+
+-- Integers with various ACN encodings
+U8  ::= INTEGER (0..255)
+U16 ::= INTEGER (0..65535)
+I32 ::= INTEGER (-2147483648..2147483647)
+Temperature ::= INTEGER (-50..150)
+
+-- Real
+Voltage ::= REAL (0.0 .. 15.5)
+
+-- Enumerated with encode-values
+DeviceMode ::= ENUMERATED { off(0), standby(5), active(10) }
+
+-- Boolean
+SafeFlag ::= BOOLEAN
+
+-- Strings
+DeviceName ::= IA5String (SIZE(1..16))
+
+-- Octet / bit strings
+Checksum   ::= OCTET STRING (SIZE(4))
+EventMask  ::= BIT STRING (SIZE(12))
+VarData    ::= OCTET STRING (SIZE(0..64))
+
+-- Sequence-of with external field length
+Samples ::= SEQUENCE (SIZE(0..10)) OF U16
+
+-- Nested sequence
+Position ::= SEQUENCE {
+    x I32,
+    y I32,
+    z I32
+}
+
+-- Choice determined by ACN present-when
+Payload ::= CHOICE {
+    ping    NULL,
+    data    VarData,
+    pos     Position
+}
+
+Telemetry ::= SEQUENCE {
+    mode      DeviceMode,
+    temp      Temperature,
+    volt      Voltage,
+    name      DeviceName,
+    safe      SafeFlag,
+    mask      EventMask,
+    smpl      Samples,
+    opt-pos   Position OPTIONAL,
+    uper-opt  U8 OPTIONAL,
+    pld       Payload,
+    crc       Checksum
+}
+
+END

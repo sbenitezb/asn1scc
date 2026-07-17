@@ -1,0 +1,1550 @@
+{
+  "navOrder": [
+    "U8@KITCHEN-SINK.U8",
+    "U16@KITCHEN-SINK.U16",
+    "I32@KITCHEN-SINK.I32",
+    "Temperature@KITCHEN-SINK.Temperature",
+    "Voltage@KITCHEN-SINK.Voltage",
+    "DeviceMode@KITCHEN-SINK.DeviceMode",
+    "SafeFlag@KITCHEN-SINK.SafeFlag",
+    "DeviceName@KITCHEN-SINK.DeviceName",
+    "Checksum@KITCHEN-SINK.Checksum",
+    "EventMask@KITCHEN-SINK.EventMask",
+    "VarData@KITCHEN-SINK.VarData",
+    "Samples@KITCHEN-SINK.Samples",
+    "Position@KITCHEN-SINK.Position",
+    "Payload@KITCHEN-SINK.Payload",
+    "Position@KITCHEN-SINK.Telemetry.opt-pos",
+    "Telemetry@KITCHEN-SINK.Telemetry",
+    "Payload@KITCHEN-SINK.Telemetry.pld"
+  ],
+  "tables": [
+    {
+      "id": "U8@KITCHEN-SINK.U8",
+      "name": "U8",
+      "kind": "INTEGER",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "U8"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.U8",
+      "usageSites": [
+        "KITCHEN-SINK.U8"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 1,
+      "maxLengthInBytes": 1,
+      "comments": [
+        " Integers with various ACN encodings"
+      ],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(0 .. 255)",
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "U16@KITCHEN-SINK.U16",
+      "name": "U16",
+      "kind": "INTEGER",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "U16"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.U16",
+      "usageSites": [
+        "KITCHEN-SINK.U16"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 2,
+      "maxLengthInBytes": 2,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(0 .. 65535)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "I32@KITCHEN-SINK.I32",
+      "name": "I32",
+      "kind": "INTEGER",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "I32"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.I32",
+      "usageSites": [
+        "KITCHEN-SINK.I32"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 4,
+      "maxLengthInBytes": 4,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(-2147483648 .. 2147483647)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Temperature@KITCHEN-SINK.Temperature",
+      "name": "Temperature",
+      "kind": "INTEGER",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "Temperature"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.Temperature",
+      "usageSites": [
+        "KITCHEN-SINK.Temperature"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 2,
+      "maxLengthInBytes": 2,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(-50 .. 150)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Voltage@KITCHEN-SINK.Voltage",
+      "name": "Voltage",
+      "kind": "REAL",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "Voltage"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.Voltage",
+      "usageSites": [
+        "KITCHEN-SINK.Voltage"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 4,
+      "maxLengthInBytes": 4,
+      "comments": [
+        " Real"
+      ],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "REAL"
+          },
+          "sConstraint": "(0 .. 15.5)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "DeviceMode@KITCHEN-SINK.DeviceMode",
+      "name": "DeviceMode",
+      "kind": "ENUMERATED",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "DeviceMode"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.DeviceMode",
+      "usageSites": [
+        "KITCHEN-SINK.DeviceMode"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 1,
+      "maxLengthInBytes": 1,
+      "comments": [
+        " Enumerated with encode-values"
+      ],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [
+            "Possible values:<br/>\n<ul class=\"enumeration\">\n<li><font class=\"enumeration_name\">off</font> (0)</li>\n<li><font class=\"enumeration_name\">standby</font> (5)</li>\n<li><font class=\"enumeration_name\">active</font> (10)</li>\n</ul>"
+          ],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "ENUMERATED"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SafeFlag@KITCHEN-SINK.SafeFlag",
+      "name": "SafeFlag",
+      "kind": "BOOLEAN",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "SafeFlag"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.SafeFlag",
+      "usageSites": [
+        "KITCHEN-SINK.SafeFlag"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 1,
+      "maxLengthInBytes": 1,
+      "comments": [
+        " Boolean"
+      ],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "BOOLEAN"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "DeviceName@KITCHEN-SINK.DeviceName",
+      "name": "DeviceName",
+      "kind": "IA5String",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "DeviceName"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.DeviceName",
+      "usageSites": [
+        "KITCHEN-SINK.DeviceName"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 2,
+      "maxLengthInBytes": 17,
+      "comments": [
+        " Strings"
+      ],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "",
+          "comments": [
+            "Each character is encoded as 8-bit ASCII."
+          ],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "IA5String"
+          },
+          "sConstraint": "(1 .. 16)",
+          "minLengthInBits": 8,
+          "maxLengthInBits": 128,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "Terminator",
+          "comments": [
+            "Null terminator '00'H marking the end of the string"
+          ],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "bit pattern"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 0,
+            "maxBits": 128,
+            "display": "0..128"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Checksum@KITCHEN-SINK.Checksum",
+      "name": "Checksum",
+      "kind": "OCTET STRING",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "Checksum"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.Checksum",
+      "usageSites": [
+        "KITCHEN-SINK.Checksum"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 4,
+      "maxLengthInBytes": 4,
+      "comments": [
+        " Octet / bit strings"
+      ],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "",
+          "comments": [
+            "Length is fixed to 4 bytes (no length determinant is needed)."
+          ],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "OCTET STRING"
+          },
+          "sConstraint": "(4)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "EventMask@KITCHEN-SINK.EventMask",
+      "name": "EventMask",
+      "kind": "BIT STRING",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "EventMask"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.EventMask",
+      "usageSites": [
+        "KITCHEN-SINK.EventMask"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 2,
+      "maxLengthInBytes": 2,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "",
+          "comments": [
+            "Length is fixed to 12 bits (no length determinant is needed)."
+          ],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "BIT STRING"
+          },
+          "sConstraint": "(12)",
+          "minLengthInBits": 12,
+          "maxLengthInBits": 12,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "VarData@KITCHEN-SINK.VarData",
+      "name": "VarData",
+      "kind": "OCTET STRING",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "VarData"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.VarData",
+      "usageSites": [
+        "KITCHEN-SINK.VarData"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 1,
+      "maxLengthInBytes": 65,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "Length",
+          "comments": [
+            "The number of bytes"
+          ],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(0 .. 64)",
+          "minLengthInBits": 7,
+          "maxLengthInBits": 7,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "OCTET STRING"
+          },
+          "sConstraint": "(0 .. 64)",
+          "minLengthInBits": 0,
+          "maxLengthInBits": 512,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 0,
+            "maxBits": 7,
+            "display": "0..7"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Samples@KITCHEN-SINK.Samples",
+      "name": "Samples",
+      "kind": "SEQUENCE OF",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "Samples"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.Samples",
+      "usageSites": [
+        "KITCHEN-SINK.Samples"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 1,
+      "maxLengthInBytes": 21,
+      "comments": [
+        " Sequence-of with external field length",
+        ""
+      ],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "Length",
+          "comments": [
+            "The number of items"
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 4,
+          "maxLengthInBits": 4,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "Item #1",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (U16)"
+          },
+          "sConstraint": "(0 .. 65535)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 4,
+            "maxBits": 4,
+            "display": "4"
+          }
+        },
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": ""
+          },
+          "sConstraint": null,
+          "minLengthInBits": 0,
+          "maxLengthInBits": 0,
+          "sUnits": null,
+          "rowType": "ThreeDOTs",
+          "offset": {
+            "kind": "none",
+            "minBits": null,
+            "maxBits": null,
+            "display": null
+          }
+        },
+        {
+          "idxOffset": 11,
+          "fieldName": "Item #10",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (U16)"
+          },
+          "sConstraint": "(0 .. 65535)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "variable",
+            "minBits": null,
+            "maxBits": null,
+            "display": "variable"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Position@KITCHEN-SINK.Position",
+      "name": "Position",
+      "kind": "SEQUENCE",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "Position"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.Position",
+      "usageSites": [
+        "KITCHEN-SINK.Position"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 12,
+      "maxLengthInBytes": 12,
+      "comments": [
+        " Nested sequence"
+      ],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "x",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (I32)"
+          },
+          "sConstraint": "(-2147483648 .. 2147483647)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "y",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (I32)"
+          },
+          "sConstraint": "(-2147483648 .. 2147483647)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 32,
+            "maxBits": 32,
+            "display": "32"
+          }
+        },
+        {
+          "idxOffset": 3,
+          "fieldName": "z",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (I32)"
+          },
+          "sConstraint": "(-2147483648 .. 2147483647)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 64,
+            "maxBits": 64,
+            "display": "64"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Payload@KITCHEN-SINK.Payload",
+      "name": "Payload",
+      "kind": "CHOICE",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "Payload"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.Payload",
+      "usageSites": [
+        "KITCHEN-SINK.Payload"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 0,
+      "maxLengthInBytes": 65,
+      "comments": [
+        " Choice determined by ACN present-when",
+        "Active alternative is determined by ACN using the field: 'payloadType'"
+      ],
+      "acnParameters": [
+        {
+          "name": "payloadType",
+          "type": {
+            "kind": "reference",
+            "id": "U8@KITCHEN-SINK.U8"
+          }
+        }
+      ],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "ping",
+          "comments": [
+            "NULL type without an ACN encoding pattern: occupies no bits on the wire"
+          ],
+          "sPresent": "payloadType=0",
+          "sType": {
+            "kind": "plain",
+            "value": "NULL"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 0,
+          "maxLengthInBits": 0,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "Length",
+          "comments": [
+            "The number of bytes"
+          ],
+          "sPresent": "payloadType=1",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(0 .. 64)",
+          "minLengthInBits": 7,
+          "maxLengthInBits": 7,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 3,
+          "fieldName": "data",
+          "comments": [],
+          "sPresent": "payloadType=1",
+          "sType": {
+            "kind": "plain",
+            "value": "OCTET STRING (VarData)"
+          },
+          "sConstraint": "(0 .. 64)",
+          "minLengthInBits": 0,
+          "maxLengthInBits": 512,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 7,
+            "maxBits": 7,
+            "display": "7"
+          }
+        },
+        {
+          "idxOffset": 4,
+          "fieldName": "pos",
+          "comments": [],
+          "sPresent": "payloadType=2",
+          "sType": {
+            "kind": "reference",
+            "id": "Position@KITCHEN-SINK.Telemetry.opt-pos"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 96,
+          "maxLengthInBits": 96,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Position@KITCHEN-SINK.Telemetry.opt-pos",
+      "name": "Position (as Telemetry.opt-pos)",
+      "kind": "SEQUENCE",
+      "tasInfo": null,
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.Telemetry.opt-pos",
+      "usageSites": [
+        "KITCHEN-SINK.Payload.pos",
+        "KITCHEN-SINK.Telemetry.opt-pos",
+        "KITCHEN-SINK.Telemetry.pld.pos"
+      ],
+      "hasAcnDefinition": false,
+      "minLengthInBytes": 12,
+      "maxLengthInBytes": 12,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "x",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (I32)"
+          },
+          "sConstraint": "(-2147483648 .. 2147483647)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "y",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (I32)"
+          },
+          "sConstraint": "(-2147483648 .. 2147483647)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 32,
+            "maxBits": 32,
+            "display": "32"
+          }
+        },
+        {
+          "idxOffset": 3,
+          "fieldName": "z",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (I32)"
+          },
+          "sConstraint": "(-2147483648 .. 2147483647)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 64,
+            "maxBits": 64,
+            "display": "64"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Telemetry@KITCHEN-SINK.Telemetry",
+      "name": "Telemetry",
+      "kind": "SEQUENCE",
+      "tasInfo": {
+        "modName": "KITCHEN-SINK",
+        "tasName": "Telemetry"
+      },
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.Telemetry",
+      "usageSites": [
+        "KITCHEN-SINK.Telemetry"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 19,
+      "maxLengthInBytes": 132,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "Presence Mask",
+          "comments": [
+            "Presence bit mask (a set bit means the corresponding field is present): bit 1 -> uper-opt"
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "bit mask"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 1,
+          "maxLengthInBits": 1,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "version",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "fixed pattern: '0001'B"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 4,
+          "maxLengthInBits": 4,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 1,
+            "maxBits": 1,
+            "display": "1"
+          }
+        },
+        {
+          "idxOffset": 3,
+          "fieldName": "smplCount",
+          "comments": [
+            "size determinant for KITCHEN-SINK.Telemetry.smpl "
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (U8)"
+          },
+          "sConstraint": "(0 .. 255)",
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 5,
+            "maxBits": 5,
+            "display": "5"
+          }
+        },
+        {
+          "idxOffset": 4,
+          "fieldName": "payloadType",
+          "comments": [
+            "reference determinant for KITCHEN-SINK.Telemetry.pld.payloadType "
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (U8)"
+          },
+          "sConstraint": "(0 .. 255)",
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 13,
+            "maxBits": 13,
+            "display": "13"
+          }
+        },
+        {
+          "idxOffset": 5,
+          "fieldName": "pos-present",
+          "comments": [
+            "Used as a presence determinant for KITCHEN-SINK.Telemetry.opt-pos "
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "BOOLEAN"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 1,
+          "maxLengthInBits": 1,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 21,
+            "maxBits": 21,
+            "display": "21"
+          }
+        },
+        {
+          "idxOffset": 6,
+          "fieldName": "mode",
+          "comments": [
+            "Possible values:<br/>\n<ul class=\"enumeration\">\n<li><font class=\"enumeration_name\">off</font> (0)</li>\n<li><font class=\"enumeration_name\">standby</font> (5)</li>\n<li><font class=\"enumeration_name\">active</font> (10)</li>\n</ul>"
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "ENUMERATED (DeviceMode)"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 22,
+            "maxBits": 22,
+            "display": "22"
+          }
+        },
+        {
+          "idxOffset": 7,
+          "fieldName": "Padding",
+          "comments": [
+            "Padding inserted by the ACN 'align-to-next byte' property (0 bits when the encoding is already byte-aligned at this point)."
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "padding bits"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 0,
+          "maxLengthInBits": 7,
+          "sUnits": null,
+          "rowType": "PaddingRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 30,
+            "maxBits": 30,
+            "display": "30"
+          }
+        },
+        {
+          "idxOffset": 8,
+          "fieldName": "temp",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (Temperature)"
+          },
+          "sConstraint": "(-50 .. 150)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 30,
+            "maxBits": 37,
+            "display": "30..37"
+          }
+        },
+        {
+          "idxOffset": 9,
+          "fieldName": "volt",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "REAL (Voltage)"
+          },
+          "sConstraint": "(0 .. 15.5)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 46,
+            "maxBits": 53,
+            "display": "46..53"
+          }
+        },
+        {
+          "idxOffset": 10,
+          "fieldName": "name",
+          "comments": [
+            "Each character is encoded as 8-bit ASCII."
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "IA5String (DeviceName)"
+          },
+          "sConstraint": "(1 .. 16)",
+          "minLengthInBits": 8,
+          "maxLengthInBits": 128,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 78,
+            "maxBits": 85,
+            "display": "78..85"
+          }
+        },
+        {
+          "idxOffset": 11,
+          "fieldName": "Terminator",
+          "comments": [
+            "Null terminator '00'H marking the end of the string"
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "bit pattern"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 86,
+            "maxBits": 213,
+            "display": "86..213"
+          }
+        },
+        {
+          "idxOffset": 12,
+          "fieldName": "safe",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "BOOLEAN (SafeFlag)"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 94,
+            "maxBits": 221,
+            "display": "94..221"
+          }
+        },
+        {
+          "idxOffset": 13,
+          "fieldName": "mask",
+          "comments": [
+            "Length is fixed to 12 bits (no length determinant is needed)."
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "BIT STRING (EventMask)"
+          },
+          "sConstraint": "(12)",
+          "minLengthInBits": 12,
+          "maxLengthInBits": 12,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 102,
+            "maxBits": 229,
+            "display": "102..229"
+          }
+        },
+        {
+          "idxOffset": 14,
+          "fieldName": "smpl",
+          "comments": [
+            "Length is determined by the external field: smplCount"
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "SEQUENCE OF (Samples)"
+          },
+          "sConstraint": "(0 .. 10)",
+          "minLengthInBits": 0,
+          "maxLengthInBits": 160,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 114,
+            "maxBits": 241,
+            "display": "114..241"
+          }
+        },
+        {
+          "idxOffset": 1,
+          "fieldName": "smpl[1]",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (U16)"
+          },
+          "sConstraint": "(0 .. 65535)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "SubItemRow",
+          "offset": {
+            "kind": "none",
+            "minBits": null,
+            "maxBits": null,
+            "display": null
+          }
+        },
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": ""
+          },
+          "sConstraint": null,
+          "minLengthInBits": 0,
+          "maxLengthInBits": 0,
+          "sUnits": null,
+          "rowType": "ThreeDOTs",
+          "offset": {
+            "kind": "none",
+            "minBits": null,
+            "maxBits": null,
+            "display": null
+          }
+        },
+        {
+          "idxOffset": 10,
+          "fieldName": "smpl[10]",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (U16)"
+          },
+          "sConstraint": "(0 .. 65535)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "SubItemRow",
+          "offset": {
+            "kind": "none",
+            "minBits": null,
+            "maxBits": null,
+            "display": null
+          }
+        },
+        {
+          "idxOffset": 15,
+          "fieldName": "opt-pos",
+          "comments": [],
+          "sPresent": "when pos-present is true",
+          "sType": {
+            "kind": "reference",
+            "id": "Position@KITCHEN-SINK.Telemetry.opt-pos"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 96,
+          "maxLengthInBits": 96,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 114,
+            "maxBits": 401,
+            "display": "114..401"
+          }
+        },
+        {
+          "idxOffset": 16,
+          "fieldName": "uper-opt",
+          "comments": [],
+          "sPresent": "when bit 1 of the Presence Mask is set",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (U8)"
+          },
+          "sConstraint": "(0 .. 255)",
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 114,
+            "maxBits": 497,
+            "display": "114..497"
+          }
+        },
+        {
+          "idxOffset": 17,
+          "fieldName": "pld",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "reference",
+            "id": "Payload@KITCHEN-SINK.Telemetry.pld"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 0,
+          "maxLengthInBits": 519,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 114,
+            "maxBits": 505,
+            "display": "114..505"
+          }
+        },
+        {
+          "idxOffset": 18,
+          "fieldName": "crc",
+          "comments": [
+            "Length is fixed to 4 bytes (no length determinant is needed)."
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "OCTET STRING (Checksum)"
+          },
+          "sConstraint": "(4)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 114,
+            "maxBits": 1024,
+            "display": "114..1024"
+          }
+        }
+      ]
+    },
+    {
+      "id": "Payload@KITCHEN-SINK.Telemetry.pld",
+      "name": "Payload (as Telemetry.pld)",
+      "kind": "CHOICE",
+      "tasInfo": null,
+      "module": "KITCHEN-SINK",
+      "usagePath": "KITCHEN-SINK.Telemetry.pld",
+      "usageSites": [
+        "KITCHEN-SINK.Telemetry.pld"
+      ],
+      "hasAcnDefinition": false,
+      "minLengthInBytes": 0,
+      "maxLengthInBytes": 65,
+      "comments": [
+        "Active alternative is determined by ACN using the field: 'payloadType'"
+      ],
+      "acnParameters": [
+        {
+          "name": "payloadType",
+          "type": {
+            "kind": "reference",
+            "id": "U8@KITCHEN-SINK.U8"
+          }
+        }
+      ],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "ping",
+          "comments": [
+            "NULL type without an ACN encoding pattern: occupies no bits on the wire"
+          ],
+          "sPresent": "payloadType=0",
+          "sType": {
+            "kind": "plain",
+            "value": "NULL"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 0,
+          "maxLengthInBits": 0,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "Length",
+          "comments": [
+            "The number of bytes"
+          ],
+          "sPresent": "payloadType=1",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(0 .. 64)",
+          "minLengthInBits": 7,
+          "maxLengthInBits": 7,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 3,
+          "fieldName": "data",
+          "comments": [],
+          "sPresent": "payloadType=1",
+          "sType": {
+            "kind": "plain",
+            "value": "OCTET STRING (VarData)"
+          },
+          "sConstraint": "(0 .. 64)",
+          "minLengthInBits": 0,
+          "maxLengthInBits": 512,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 7,
+            "maxBits": 7,
+            "display": "7"
+          }
+        },
+        {
+          "idxOffset": 4,
+          "fieldName": "pos",
+          "comments": [],
+          "sPresent": "payloadType=2",
+          "sType": {
+            "kind": "reference",
+            "id": "Position@KITCHEN-SINK.Telemetry.opt-pos"
+          },
+          "sConstraint": null,
+          "minLengthInBits": 96,
+          "maxLengthInBits": 96,
+          "sUnits": null,
+          "rowType": "LengthDeterminantRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    }
+  ]
+}

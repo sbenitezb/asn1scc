@@ -33,7 +33,7 @@ SequenceOf()    ::= "SEQUENCE-OF"
 ObjectIdentifier()       ::= "OBJECT IDENTIFIER"
 RelativeOid()       ::= "RELATIVE-OID"
 
-EmitRowWith3Dots() ::= "| . . . | | | | | | | | |"
+EmitRowWith3Dots() ::= "| . . . | | | | | | | | | |"
 
 EmitFilePart2(sFileName, arrsAsn1Content) ::= <<
 # File: $sFileName$
@@ -56,6 +56,16 @@ $arrsTases;separator="\n"$
 
 EmitNavLink(sTitle, sTarget) ::= <<
 - [$sTitle$](#ICD_$sTarget$)
+>>
+
+/* Nav module header: the target is the module anchor emitted by EmitModule (roadmap B4) */
+EmitNavModule(sModName) ::= <<
+- **[Module $sModName$](#ICD_$sModName$)**
+>>
+
+/* Nav entry of a -icdPdus root: listed first within its module, visually distinct (roadmap B4) */
+EmitNavLinkRootPdu(sTitle, sTarget) ::= <<
+- **[$sTitle$](#ICD_$sTarget$)**
 >>
 
 EmitTass(sTypeContent) ::= <<
@@ -106,16 +116,17 @@ $if(arrsParams)$
 $arrsParams$
 $endif$
 
-| No | Field | Comment | Present | Type | Constraint | Min Bits | Max Bits | Unit |
-|---:|:---|:---|:---|:---|:---|---:|---:|:---|
+| No | Field | Comment | Present | Type | Constraint | Offset (bits) | Min Bits | Max Bits | Unit |
+|---:|:---|:---|:---|:---|:---|---:|---:|---:|:---|
 $arrsChildren;separator="\n"$
 >>
 
-EmitSeqOrChoiceRow(sCssClass, nIndex, sName, sComment, sPresentWhen, sType, sConstraint, sMin, sMax, noAlignToNextSize, soUnit) ::= <<
+/* soStartOffset (roadmap D1, append-only): cumulative "starts at" bit offset. */
+EmitSeqOrChoiceRow(sCssClass, nIndex, sName, sComment, sPresentWhen, sType, sConstraint, sMin, sMax, noAlignToNextSize, soUnit, soStartOffset, soIndexOverride) ::= <<
 $if(noAlignToNextSize)$
-| | padding field | present due to align-to-next property | | padding bits | | 0 | $noAlignToNextSize$ | $soUnit$ |
+| | padding field | present due to align-to-next property | | padding bits | | | 0 | $noAlignToNextSize$ | $soUnit$ |
 $endif$
-| $nIndex$ | $sName$ | $sComment$ | $sPresentWhen$ | $sType$ | $sConstraint$ | $sMin$ | $sMax$ | $soUnit$ |
+| $if(soIndexOverride)$$soIndexOverride$$else$$nIndex$$endif$ | $sName$ | $sComment$ | $sPresentWhen$ | $sType$ | $sConstraint$ | $soStartOffset$ | $sMin$ | $sMax$ | $soUnit$ |
 >>
 
 EmitSequencePreambleSingleComment(nIndex, sOptChildName) ::= <<

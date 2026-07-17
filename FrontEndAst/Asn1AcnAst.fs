@@ -344,6 +344,7 @@ type RealEncodingClass =
     | Real_IEEE754_64_big_endian
     | Real_IEEE754_32_little_endian
     | Real_IEEE754_64_little_endian
+    | Real_ScaledInt of IntEncodingClass    //REAL encoded as scaled integer; the payload can only be a PositiveInteger_ConstSize* or TwosComplement_ConstSize* variant
 
 type StringAcnEncodingClass =
     | Acn_Enc_String_uPER                                   of BigInteger                          //char size in bits, as in uper
@@ -351,6 +352,7 @@ type StringAcnEncodingClass =
     | Acn_Enc_String_Ascii_Null_Terminated                  of BigInteger*(byte  list)             //char size in bits, byte = the null character
     | Acn_Enc_String_Ascii_External_Field_Determinant       of BigInteger*RelativePath             //char size in bits, encode ascii, size is provided by an external length determinant
     | Acn_Enc_String_CharIndex_External_Field_Determinant   of BigInteger*RelativePath             //char size in bits, encode char index, size is provided by an external length determinant
+    | Acn_Enc_String_Ascii_Deduced                          of BigInteger                          //char size in bits (8), encode ascii, size deduced from the enclosing decoding region
 with
     member this.charSizeInBits: bigint =
         match this with
@@ -358,7 +360,8 @@ with
         | Acn_Enc_String_uPER_Ascii c
         | Acn_Enc_String_Ascii_Null_Terminated (c, _)
         | Acn_Enc_String_Ascii_External_Field_Determinant (c, _)
-        | Acn_Enc_String_CharIndex_External_Field_Determinant (c, _) -> c
+        | Acn_Enc_String_CharIndex_External_Field_Determinant (c, _)
+        | Acn_Enc_String_Ascii_Deduced c -> c
 
 type SizeableAcnEncodingClass =
     //| SZ_EC_uPER
@@ -366,6 +369,7 @@ type SizeableAcnEncodingClass =
     | SZ_EC_LENGTH_EMBEDDED     of BigInteger //embedded length determinant size in bits
     | SZ_EC_ExternalField       of RelativePath
     | SZ_EC_TerminationPattern  of BitStringValue
+    | SZ_EC_Deduced                           //size deduced from the enclosing decoding region (no length determinant)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////// FRONT END TYPE DEFINITIONS   /////////////////////////////////////////////////////////////////////////////////////////////////////////////

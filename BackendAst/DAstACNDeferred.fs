@@ -266,6 +266,39 @@ let private createDeferredSequenceFunction
                             if isOwnParam then DAstACN.getAcnDeterminantName ac.id
                             else ToC ac.Name.Value
                         let originalFuncBody = ac.funcBody
+                        // Determinant ICD comment(s) ("size determinant for ...",
+                        // "reference determinant for ...") normally reach the row via
+                        // funcUpdateStatement.icdComments, but a deferred child carries
+                        // no funcUpdateStatement (its value is patched later).
+                        // Recompute them here from the dependency list — the same
+                        // comment text the legacy inline path uses — and graft them
+                        // onto the borrowed icd row so the --acn-v2 ICD matches legacy
+                        // (roadmap B8).  ICD-only; no codegen effect.
+                        //
+                        // Closure conversion may have rewritten a CONTAINING
+                        // external-field size determinant (legacy: a direct
+                        // AcnDepSizeDeterminant_bit_oct_str_contain) into a
+                        // RefTypeArgument pointing at a synthesized size parameter.
+                        // Follow that one hop back so the comment reads "size
+                        // determinant for <payload>" exactly like legacy, while
+                        // leaving genuine reference determinants (arguments the user
+                        // wrote for real ACN parameters, e.g. buffer-len) as
+                        // "reference determinant for ...".
+                        let commentFor (d: AcnDependency) =
+                            match d.dependencyKind with
+                            | AcnDepRefTypeArgument prm ->
+                                let containingSizeDep =
+                                    deps.acnDependencies |> List.tryFind (fun d2 ->
+                                        d2.determinant.id = prm.id &&
+                                        (match d2.dependencyKind with AcnDepSizeDeterminant_bit_oct_str_contain _ -> true | _ -> false))
+                                match containingSizeDep with
+                                | Some d2 -> AcnDependencies.icdCommentsForDependency d2
+                                | None    -> AcnDependencies.icdCommentsForDependency d
+                            | _ -> AcnDependencies.icdCommentsForDependency d
+                        let detComments =
+                            deps.acnDependencies
+                            |> List.filter (fun d -> d.determinant.id = ac.id)
+                            |> List.collect commentFor
                         let deferredFuncBody : CommonTypes.Codec -> ((AcnGenericTypes.RelativePath*AcnGenericTypes.AcnParameter) list) -> NestingScope -> CodegenScope -> string -> (AcnFuncBodyResult option) =
                             fun innerCodec acnArgs nestingScope p bsPos ->
                                 match innerCodec with
@@ -291,9 +324,19 @@ let private createDeferredSequenceFunction
                                     // bits at the same position), only the
                                     // computation timing differs (InitDet
                                     // reserves, PatchDet fills in later).
+                                    // The second funcBody evaluation exists solely to
+                                    // harvest the icd row; skip it entirely when the ICD
+                                    // is not requested (roadmap B8 perf note).
                                     let originalIcd =
-                                        originalFuncBody innerCodec acnArgs nestingScope p bsPos
-                                        |> Option.bind (fun r -> r.icdResult)
+                                        match r.args.generateAcnIcd with
+                                        | false -> None
+                                        | true  ->
+                                            originalFuncBody innerCodec acnArgs nestingScope p bsPos
+                                            |> Option.bind (fun rr -> rr.icdResult)
+                                            |> Option.map (fun aux ->
+                                                match detComments with
+                                                | [] -> aux
+                                                | _  -> { aux with rowsFunc = fun n pres extra -> aux.rowsFunc n pres (extra @ detComments) })
                                     Some {
                                         AcnFuncBodyResult.funcBody = initCode
                                         errCodes = []

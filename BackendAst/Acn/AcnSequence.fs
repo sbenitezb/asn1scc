@@ -67,7 +67,24 @@ type private SequenceChildCtx = {
 
 // Build the NestingScope for one child of a SEQUENCE.  Same recipe used
 // by both the Asn1Child and the AcnChild branches.
-let private mkChildNestingScope (ctx:SequenceChildCtx) (s:SequenceChildState) : NestingScope =
+// childName identifies the child within ctx.o.children so that the
+// 'size deduced' trailing constant (total ACN bits of all components that
+// follow this child, see Docs/deduced-size-spec.md) can be accumulated on
+// top of the parent's own trailing constant.
+let private mkChildNestingScope (ctx:SequenceChildCtx) (s:SequenceChildState) (childName:string) : NestingScope =
+    let trailingAfterChild =
+        let rec sumAfter found acc (cs:Asn1AcnAst.SeqChildInfo list) =
+            match cs with
+            | [] -> acc
+            | c::rest ->
+                let name, szBits =
+                    match c with
+                    | Asn1AcnAst.Asn1Child a -> a.Name.Value, a.Type.acnMaxSizeInBits
+                    | Asn1AcnAst.AcnChild  a -> a.Name.Value, a.Type.acnMaxSizeInBits
+                match found with
+                | true  -> sumAfter true (acc + szBits) rest
+                | false -> sumAfter (name = childName) acc rest
+        sumAfter false 0I ctx.o.children
     {ctx.nestingScope with
         nestingLevel = ctx.nestingScope.nestingLevel + 1I
         nestingIx = ctx.nestingScope.nestingIx + s.childIx
@@ -76,6 +93,7 @@ let private mkChildNestingScope (ctx:SequenceChildCtx) (s:SequenceChildState) : 
         acnRelativeOffset = s.acnAccBits
         acnOffset = ctx.nestingScope.acnOffset + s.acnAccBits
         parents = (ctx.p, ctx.t) :: ctx.nestingScope.parents
+        deducedTrailingBits = ctx.nestingScope.deducedTrailingBits + trailingAfterChild
         parentSavePositionVar =
             match ctx.hasOwnPostEncoding with
             | true  -> Some ctx.bitStreamPositionsLocalVar
@@ -97,7 +115,7 @@ let private handleAsn1Child
     let deps = ctx.deps
     let us = s.us
     let soSaveBitStrmPosStatement = None
-    let childNestingScope = mkChildNestingScope ctx s
+    let childNestingScope = mkChildNestingScope ctx s child.Name.Value
 
     let childTypeDef = child.Type.typeDefinitionOrReference.longTypedefName2 lm.lg.hasModules
     let childName = lm.lg.getAsn1ChildBackendName child
@@ -219,7 +237,7 @@ let private handleAcnChild
     let p = ctx.p
     let us = s.us
     let soSaveBitStrmPosStatement = None
-    let childNestingScope = mkChildNestingScope ctx s
+    let childNestingScope = mkChildNestingScope ctx s acnChild.Name.Value
 
     //handle updates
     let childP = {CodegenScope.modName = p.modName; accessPath= AccessPath.valueEmptyPath (getAcnDeterminantName acnChild.id)}
@@ -327,16 +345,28 @@ let createSequenceFunction_inline (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnIns
 
     let acnChildren = children |>  List.choose(fun x -> match x with AcnChild z -> Some z | Asn1Child _ -> None)
     let asn1Children = children |>  List.choose(fun x -> match x with Asn1Child z -> Some z | AcnChild _ -> None)
-    let sPresenceBitIndexMap  =
+    // Children covered by the uPER presence bit mask: only optionals whose
+    // presence is NOT governed by an ACN present-when clause (same predicate
+    // as nbPresenceBits in funcBody below). Bit numbers are 1-based, in wire order.
+    let uperMaskChildren =
         asn1Children |>
-        List.filter(fun c -> match c.Optionality with Some(Optional _) -> true | _ -> false) |>
-        List.mapi (fun i c -> (c.Name.Value, i)) |>
+        List.filter(fun c ->
+            match c.Optionality with
+            | Some(Optional opt) ->
+                match opt.acnPresentWhen with
+                | None   -> true
+                | Some _ -> false
+            | _ -> false)
+    let sPresenceBitIndexMap  =
+        uperMaskChildren |>
+        List.mapi (fun i c -> (c.Name.Value, i + 1)) |>
         Map.ofList
     let uperPresenceMask =
-        match sPresenceBitIndexMap.IsEmpty with
-        | true -> []
-        | false ->
-            [{IcdRow.fieldName = "Presence Mask"; comments = [$"Presence bit mask"]; sPresent="always";sType=IcdPlainType "bit mask"; sConstraint=None; minLengthInBits = sPresenceBitIndexMap.Count.AsBigInt ;maxLengthInBits=sPresenceBitIndexMap.Count.AsBigInt;sUnits=None; rowType = IcdRowType.LengthDeterminantRow; idxOffset = None}]
+        match uperMaskChildren with
+        | [] -> []
+        | _  ->
+            let sBitToFieldMap = uperMaskChildren |> List.mapi (fun i c -> $"bit %d{i + 1} -> %s{c.Name.Value}") |> Seq.StrJoin ", "
+            [{IcdRow.fieldName = "Presence Mask"; comments = [$"Presence bit mask (a set bit means the corresponding field is present): %s{sBitToFieldMap}"]; sPresent="always";sType=IcdPlainType "bit mask"; sConstraint=None; minLengthInBits = uperMaskChildren.Length.AsBigInt ;maxLengthInBits=uperMaskChildren.Length.AsBigInt;sUnits=None; rowType = IcdRowType.LengthDeterminantRow; idxOffset = None}]
 
     let icd_asn1_child (c:Asn1Child) (extra_comments:string list) : ((IcdRow list) * (IcdTypeAss list)) =
         let optionality =
@@ -346,12 +376,13 @@ let createSequenceFunction_inline (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnIns
             | Some(AlwaysPresent) -> "always"
             | Some(Optional  opt) ->
                 match opt.acnPresentWhen with
-                | None                                      -> $"when bit %d{sPresenceBitIndexMap[c.Name.Value]} is set in the uPER bit mask"
+                | None                                      -> $"when bit %d{sPresenceBitIndexMap[c.Name.Value]} of the Presence Mask is set"
                 | Some(PresenceWhenBool relPath)            -> $"when %s{relPath.AsString} is true"
                 | Some(PresenceWhenBoolExpression acnExp)   ->
-                    let dummyScope = {CodegenScope.modName = ""; accessPath = AccessPath.valueEmptyPath "dummy"}
-                    let retExp = AcnExpression.acnExpressionToBackendExpression lm o dummyScope acnExp
-                    $"when %s{retExp}"
+                    // Render the condition in ACN syntax (as the user wrote it),
+                    // not in target-language syntax.
+                    let _, sAcnExp = AcnGenericCreateFromAntlr.printDebug acnExp
+                    $"when %s{sAcnExp}"
         let comments = (c.Comments |> Seq.toList)@extra_comments
         let childIcdTas = c.Type.icdTas
         //let isRef = match c.Type.Kind with ReferenceType _ -> true | _ -> false
@@ -363,7 +394,8 @@ let createSequenceFunction_inline (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnIns
                 chRows, []
             | false ->
                 let sType = TypeHash childIcdTas.hash
-                [{IcdRow.fieldName = c.Name.Value; comments = comments; sPresent=optionality;sType=sType; sConstraint=None; minLengthInBits = c.Type.acnMinSizeInBits; maxLengthInBits=c.Type.acnMaxSizeInBits;sUnits=None; rowType = IcdRowType.LengthDeterminantRow; idxOffset = None}], [childIcdTas]
+                let sConstraint = constraintsToIcdStr c.Type.ConstraintsAsn1Str
+                [{IcdRow.fieldName = c.Name.Value; comments = comments; sPresent=optionality;sType=sType; sConstraint=sConstraint; minLengthInBits = c.Type.acnMinSizeInBits; maxLengthInBits=c.Type.acnMaxSizeInBits;sUnits=None; rowType = IcdRowType.LengthDeterminantRow; idxOffset = None}], [childIcdTas]
         | None ->
             [], []
 
@@ -531,7 +563,7 @@ let createSequenceFunction_inline (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnIns
             let chRows0, compositeChildren0 = childrenStatements00 |> List.map (fun s -> s.icdResult) |> List.unzip
             let chRows = chRows0 |> List.collect id
             let compositeChildren = compositeChildren0 |> List.collect id
-            uperPresenceMask@chRows |> List.mapi(fun i r -> {r with idxOffset = Some (i+1)}), compositeChildren
+            renumberIcdRows (uperPresenceMask@chRows), compositeChildren
         let icd = {IcdArgAux.canBeEmbedded = false; baseAsn1Kind = (getASN1Name t); rowsFunc = icdFnc; commentsForTas=[]; scope="type"; name= None}
 
         match existsAcnChildWithNoUpdates with

@@ -72,6 +72,23 @@ type private DepContext = {
     d:    AcnDependency
 }
 
+/// The auto-generated ICD comment(s) for a determinant, derived purely from
+/// the dependency (no state / error-code side effects).  Single source of
+/// truth shared by the per-case update handlers below AND by the --acn-v2
+/// deferred backend (DAstACNDeferred), which computes determinant comments
+/// directly from the un-dealiased dependency list because its deferred ACN
+/// children carry no funcUpdateStatement to harvest them from (roadmap B8).
+let icdCommentsForDependency (d: AcnDependency) : string list =
+    match d.dependencyKind with
+    | AcnDepRefTypeArgument acnPrm                    -> [sprintf "reference determinant for %s " (acnPrm.id.AsString)]
+    | AcnDepSizeDeterminant _                         -> [sprintf "size determinant for %s " (d.asn1Type.AsString)]
+    | AcnDepSizeDeterminant_bit_oct_str_contain _     -> [sprintf "size determinant for %s " (d.asn1Type.AsString)]
+    | AcnDepIA5StringSizeDeterminant _                -> [sprintf "size determinant for %s " (d.asn1Type.AsString)]
+    | AcnDepPresenceBool                              -> [sprintf "Used as a presence determinant for %s " (d.asn1Type.AsString)]
+    | AcnDepPresence (_, chc)                         -> [sprintf "Used as a presence determinant for %s " (chc.typeDef[CommonTypes.ProgrammingLanguage.ActiveLanguages.Head].asn1Name)]
+    | AcnDepPresenceStr _                             -> []
+    | AcnDepChoiceDeterminant (_, chc, _)             -> [sprintf "Used as a presence determinant for %s " (chc.typeDef[CommonTypes.ProgrammingLanguage.ActiveLanguages.Head].asn1Name)]
+
 let rec handleSingleUpdateDependency (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnInsertedFieldDependencies) (lm:LanguageMacros) (m:Asn1AcnAst.Asn1Module) (d:AcnDependency)  (us:State) =
     let ctx = { r=r; deps=deps; lm=lm; m=m; d=d }
     match d.dependencyKind with
@@ -91,7 +108,7 @@ and private handleRefTypeArgument (ctx: DepContext) (acnPrm: AcnGenericTypes.Acn
     | Some prmUpdateStatement   ->
         let updateFunc (child: AcnChild) (nestingScope: NestingScope) (vTarget : CodegenScope) (pSrcRoot : CodegenScope) =
             prmUpdateStatement.updateAcnChildFnc child nestingScope vTarget pSrcRoot
-        let icdComments = [sprintf "reference determinant for %s " (acnPrm.id.AsString)]
+        let icdComments = icdCommentsForDependency ctx.d
         Some ({AcnChildUpdateResult.updateAcnChildFnc = updateFunc; icdComments=icdComments; errCodes=prmUpdateStatement.errCodes; testCaseFnc = prmUpdateStatement.testCaseFnc; localVariables=[]}), ns1
 
 and private handleSizeDeterminant (ctx: DepContext) (minSize: SIZE) (maxSize: SIZE) (us: State) =
@@ -114,7 +131,7 @@ and private handleSizeDeterminant (ctx: DepContext) (minSize: SIZE) (maxSize: SI
         | _     -> lm.acn.checkAccessPath checkPath updateStatement v (initExpr r lm m child.Type)
     let testCaseFnc (atc:AutomaticTestCase) : TestCaseValue option =
         atc.testCaseTypeIDsMap.TryFind d.asn1Type
-    let icdComments = [sprintf "size determinant for %s " (d.asn1Type.AsString)]
+    let icdComments = icdCommentsForDependency ctx.d
     Some ({AcnChildUpdateResult.updateAcnChildFnc = updateFunc; icdComments=icdComments; errCodes=[]; testCaseFnc=testCaseFnc; localVariables=[]}), us
 
 and private handleSizeDeterminantContaining (ctx: DepContext) (o: Asn1AcnAst.ReferenceType) (us: State) =
@@ -159,7 +176,7 @@ and private handleSizeDeterminantContaining (ctx: DepContext) (o: Asn1AcnAst.Ref
     let testCaseFnc (atc:AutomaticTestCase) : TestCaseValue option =
         atc.testCaseTypeIDsMap.TryFind d.asn1Type
     let localVars = lm.lg.acn.getAcnDepSizeDeterminantLocVars sReqBytesForUperEncoding
-    let icdComments = [sprintf "size determinant for %s " (d.asn1Type.AsString)]
+    let icdComments = icdCommentsForDependency ctx.d
     Some ({AcnChildUpdateResult.updateAcnChildFnc = updateFunc; icdComments=icdComments; errCodes=errCodes0; testCaseFnc=testCaseFnc; localVariables= localVariables0@localVars}), ns
 
 and private handleIA5StringSizeDeterminant (ctx: DepContext) (minSize: SIZE) (maxSize: SIZE) (us: State) =
@@ -174,7 +191,7 @@ and private handleIA5StringSizeDeterminant (ctx: DepContext) (minSize: SIZE) (ma
         | _     -> lm.acn.checkAccessPath checkPath updateStatement v (initExpr r lm m child.Type)
     let testCaseFnc (atc:AutomaticTestCase) : TestCaseValue option =
         atc.testCaseTypeIDsMap.TryFind d.asn1Type
-    let icdComments = [sprintf "size determinant for %s " (d.asn1Type.AsString)]
+    let icdComments = icdCommentsForDependency ctx.d
     Some ({AcnChildUpdateResult.updateAcnChildFnc = updateFunc; icdComments=icdComments; errCodes=[]; testCaseFnc=testCaseFnc; localVariables=[]}), us
 
 and private handlePresenceBool (ctx: DepContext) (us: State) =
@@ -194,12 +211,12 @@ and private handlePresenceBool (ctx: DepContext) (us: State) =
         match atc.testCaseTypeIDsMap.TryFind(d.asn1Type) with
         | Some _    -> Some TcvComponentPresent
         | None      -> Some TcvComponentAbsent
-    let icdComments = [sprintf "Used as a presence determinant for %s " (d.asn1Type.AsString)]
+    let icdComments = icdCommentsForDependency ctx.d
     Some ({AcnChildUpdateResult.updateAcnChildFnc = updateFunc; icdComments=icdComments; errCodes=[]; testCaseFnc=testCaseFnc; localVariables=[]}), us
 
 and private handlePresenceChoice (ctx: DepContext) (relPath: AcnGenericTypes.RelativePath) (chc: Asn1AcnAst.Choice) (us: State) =
     let r, lm, m, d = ctx.r, ctx.lm, ctx.m, ctx.d
-    let icdComments = [sprintf "Used as a presence determinant for %s " (chc.typeDef[CommonTypes.ProgrammingLanguage.ActiveLanguages.Head].asn1Name)]
+    let icdComments = icdCommentsForDependency ctx.d
     let updateFunc (child: AcnChild) (nestingScope: NestingScope) (vTarget : CodegenScope) (pSrcRoot : CodegenScope) =
         let v = lm.lg.getValue vTarget.accessPath
         let pBase, relPath1 = resolveDepScope nestingScope pSrcRoot d.asn1Type
@@ -299,7 +316,7 @@ and private handleChoiceDeterminant (ctx: DepContext) (enm: Asn1AcnAst.Reference
         | _     -> lm.acn.checkAccessPath checkPath updateStatement2 v (initExpr r lm m child.Type)
     let testCaseFnc (atc:AutomaticTestCase) : TestCaseValue option =
         atc.testCaseTypeIDsMap.TryFind d.asn1Type
-    let icdComments = [sprintf "Used as a presence determinant for %s " (chc.typeDef[CommonTypes.ProgrammingLanguage.ActiveLanguages.Head].asn1Name)]
+    let icdComments = icdCommentsForDependency ctx.d
     Some ({AcnChildUpdateResult.updateAcnChildFnc = updateFunc; icdComments=icdComments; errCodes=[] ; testCaseFnc=testCaseFnc; localVariables=[]}), us
 
 and getUpdateFunctionUsedInEncoding (r: Asn1AcnAst.AstRoot) (deps: Asn1AcnAst.AcnInsertedFieldDependencies) (lm: LanguageMacros) (m: Asn1AcnAst.Asn1Module) (acnChildOrAcnParameterId) (us:State) : (AcnChildUpdateResult option*State)=

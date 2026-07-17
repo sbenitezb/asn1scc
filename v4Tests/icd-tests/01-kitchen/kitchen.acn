@@ -1,0 +1,52 @@
+KITCHEN-SINK DEFINITIONS ::= BEGIN
+
+U8  [encoding pos-int, size 8]
+U16 [encoding pos-int, size 16, endianness big]
+I32 [encoding twos-complement, size 32, endianness little]
+Temperature [encoding twos-complement, size 16]
+
+Voltage [encoding IEEE754-1985-32]
+
+DeviceMode [encoding pos-int, size 8, encode-values]
+
+SafeFlag [true-value '11111111'B]
+
+DeviceName [encoding ASCII, size null-terminated, termination-pattern '00'H]
+
+Checksum []
+EventMask []
+VarData []
+
+Samples []
+
+Position [] {
+    x [],
+    y [],
+    z []
+}
+
+Payload <U8:payloadType> [] {
+    ping [present-when payloadType==0],
+    data [present-when payloadType==1],
+    pos  [present-when payloadType==2]
+}
+
+Telemetry [] {
+    version NULL [pattern '0001'B],
+    smplCount U8 [],
+    payloadType U8 [],
+    pos-present BOOLEAN [],
+    mode [],
+    temp [align-to-next byte],
+    volt [],
+    name [],
+    safe [],
+    mask [],
+    smpl [size smplCount],
+    opt-pos [present-when pos-present],
+    uper-opt [],
+    pld <payloadType> [],
+    crc []
+}
+
+END

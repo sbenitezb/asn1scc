@@ -39,6 +39,7 @@ let rec printTypeEncSpec (t:AcnTypeEncodingSpec) =
                 match siz with
                 | GP_Fixed                 size         -> stg_acn.PP_Size_Fixed size.Value
                 | GP_NullTerminated                     -> stg_acn.PP_Size_NullTerminated ()
+                | GP_Deduced                            -> stg_acn.PP_Size_Deduced ()
                 | GP_SizeDeterminant       relativePath -> stg_acn.PP_Sixe_Fld relativePath.AsString
 
             | ALIGNTONEXT        al             ->

@@ -310,6 +310,8 @@
         <xsd:restriction base="xsd:string">
             <xsd:enumeration value="IEEE754-1985-32" />
             <xsd:enumeration value="IEEE754-1985-64" />
+            <xsd:enumeration value="pos-int" />
+            <xsd:enumeration value="twos-complement" />
         </xsd:restriction>
     </xsd:simpleType>
 
@@ -380,6 +382,7 @@
             <xsd:attribute name="uperMinSizeInBits" use="required"><xsd:simpleType><xsd:restriction base="xsd:integer"></xsd:restriction></xsd:simpleType></xsd:attribute>
             <xsd:attribute name="endianness" use="optional"><xsd:simpleType><xsd:restriction base = "AcnEndianness"></xsd:restriction></xsd:simpleType></xsd:attribute>
             <xsd:attribute name="encoding" use="optional"><xsd:simpleType><xsd:restriction base = "AcnRealEncoding"></xsd:restriction></xsd:simpleType></xsd:attribute>
+            <xsd:attribute name="size" use="optional"><xsd:simpleType><xsd:restriction base="xsd:string"></xsd:restriction></xsd:simpleType></xsd:attribute>
 
         </xsd:complexType>
     </xsd:element>

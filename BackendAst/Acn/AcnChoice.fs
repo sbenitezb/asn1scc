@@ -105,13 +105,14 @@ let createChoiceFunction (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnInsertedFiel
                         | true -> childIcdTas.createRowsFunc c.Name.Value optionality childComments
                         | false ->
                             let sType = TypeHash childIcdTas.hash
-                            let icdRow = [{IcdRow.fieldName = c.Name.Value; comments = comments; sPresent=optionality;sType=sType; sConstraint=None; minLengthInBits = c.chType.acnMinSizeInBits; maxLengthInBits=c.chType.acnMaxSizeInBits;sUnits=None; rowType = IcdRowType.LengthDeterminantRow; idxOffset = None}]
+                            let sConstraint = constraintsToIcdStr c.chType.ConstraintsAsn1Str
+                            let icdRow = [{IcdRow.fieldName = c.Name.Value; comments = childComments; sPresent=optionality;sType=sType; sConstraint=sConstraint; minLengthInBits = c.chType.acnMinSizeInBits; maxLengthInBits=c.chType.acnMaxSizeInBits;sUnits=None; rowType = IcdRowType.LengthDeterminantRow; idxOffset = None}]
                             let compChild = [childIcdTas]
                             icdRow, compChild
                     |None -> [],[]) |> List.unzip
         let chRows = chRows0 |> List.collect id
         let compositeChildren = compositeChildren0 |> List.collect id
-        let icdRows = uperPresenceMask@chRows |> List.mapi(fun i r -> {r with idxOffset = Some (i+1)})
+        let icdRows = renumberIcdRows (uperPresenceMask@chRows)
         icdRows, compositeChildren
 
     let icd = {IcdArgAux.canBeEmbedded = false; baseAsn1Kind = (getASN1Name t); rowsFunc = icdFnc; commentsForTas=extraComment; scope="type"; name= None}

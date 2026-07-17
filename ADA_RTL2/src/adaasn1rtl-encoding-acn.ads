@@ -1214,6 +1214,36 @@ is
       Post => Result.Success and
       bs.Current_Bit_Pos = bs'Old.Current_Bit_Pos + 64;
 
+   --  REAL encoded as scaled integer.
+   --  The REAL range [a, b] is mapped linearly onto the integer range
+   --  [IntMin, IntMax]:
+   --     encoded = round((RealVal - Low) / Scale) + IntMin
+   --     real    = Low + (encoded - IntMin) * Scale
+   --  where Low = a and Scale = (b - a) / (IntMax - IntMin) are computed by
+   --  the compiler.  Rounding is half away from zero ('Rounding attribute).
+   --  Out-of-range inputs are clamped to the integer range (constraint
+   --  validity is checked separately by the generated code).
+
+   function Acn_Real2ScaledUInt
+     (RealVal : Asn1Real; Low : Asn1Real; Scale : Asn1Real;
+      UIntMax : Asn1UInt) return Asn1UInt with
+      Pre  => Scale > 0.0,
+      Post => Acn_Real2ScaledUInt'Result <= UIntMax;
+
+   function Acn_Real2ScaledSInt
+     (RealVal : Asn1Real; Low : Asn1Real; Scale : Asn1Real; IntMin : Asn1Int;
+      IntMax  : Asn1Int) return Asn1Int with
+      Pre  => Scale > 0.0 and then IntMin <= IntMax,
+      Post => Acn_Real2ScaledSInt'Result >= IntMin
+      and Acn_Real2ScaledSInt'Result <= IntMax;
+
+   function Acn_ScaledUInt2Real
+     (IntVal : Asn1UInt; Low : Asn1Real; Scale : Asn1Real) return Asn1Real;
+
+   function Acn_ScaledSInt2Real
+     (IntVal : Asn1Int; Low : Asn1Real; Scale : Asn1Real; IntMin : Asn1Int)
+      return Asn1Real;
+
    procedure Acn_Enc_Boolean_true_pattern
      (bs : in out Bitstream; BoolVal : Asn1Boolean; pattern : BitArray) with
       Depends => (bs => (bs, BoolVal, pattern)),

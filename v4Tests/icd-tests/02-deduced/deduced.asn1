@@ -1,0 +1,13 @@
+DEDUCED-TEST DEFINITIONS AUTOMATIC TAGS ::= BEGIN
+
+    MyInt ::= INTEGER (0..16383)
+
+    TLVList ::= SEQUENCE (SIZE(0..100)) OF MyInt
+
+    MyPDU ::= SEQUENCE {
+        hdr   INTEGER (0..255),
+        items TLVList,
+        crc   INTEGER (0..4294967295)
+    }
+
+END

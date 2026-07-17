@@ -1123,8 +1123,9 @@ let serializeIcdTasToText (icdTypeAss: IcdTypeAss) =
         name = %A
         kind = %A
         comments = %A
+        acnParameters = %A
         minLengthInBytes = %A
         maxLengthInBytes = %A
-        rows = 
+        rows =
             %A
-        """ icdTypeAss.typeId.AsString icdTypeAss.acnLink icdTypeAss.asn1Link  icdTypeAss.name icdTypeAss.kind icdTypeAss.comments icdTypeAss.minLengthInBytes icdTypeAss.maxLengthInBytes rws
+        """ icdTypeAss.typeId.AsString icdTypeAss.acnLink icdTypeAss.asn1Link  icdTypeAss.name icdTypeAss.kind icdTypeAss.comments icdTypeAss.acnParameters icdTypeAss.minLengthInBytes icdTypeAss.maxLengthInBytes rws

@@ -28,8 +28,11 @@ let buildReferenceIcdArgAux
         (t: Asn1AcnAst.Asn1Type)
         (o: Asn1AcnAst.ReferenceType)
         (baseType: Asn1Type) : IcdArgAux option =
-    let getNewSType (rw:IcdRow) = rw
-    let icdFnc, extraComment, name =
+    // Named-type identity of the referenced TAS ("INTEGER (I32)", roadmap A4)
+    // is added centrally by AcnFunctionWrapper.createAcnFunction from the
+    // resolved instance's inheritInfo - the delegation below must therefore
+    // NOT suffix the rows again.
+    let icdFnc, extraComment, name, refCanBeEmbedded =
         match r.args.generateAcnIcd with
         | true  ->
             match o.encodingOptions with
@@ -37,33 +40,63 @@ let buildReferenceIcdArgAux
                 let name =
                     match o.hasExtraConstrainsOrChildrenOrAcnArgs with
                     | false -> None
-                    | true  -> Some t.id.AsString.RDD
+                    | true  ->
+                        // In --acn-v2, closure conversion sets
+                        // hasExtraConstrainsOrChildrenOrAcnArgs=true and appends
+                        // acnArguments to EVERY cross-scope determinant reference,
+                        // even a plain TAS reference the user wrote without extras
+                        // (e.g. pdu10's `hdr Header`).  Using the usage-path RDD
+                        // name (MyModule-PDU-hdr) then leaks the internal transform
+                        // into the ICD; legacy mode names the table after the
+                        // referenced TAS (Header).  Present the deferred reference
+                        // as the referenced TAS so v2 matches legacy (roadmap B8).
+                        match r.args.acnDeferred with
+                        | true  -> None
+                        | false -> Some t.id.AsString.RDD
                 match baseType.icdTas with
                 | Some baseTypeIcdTas ->
                     let icdFnc fieldName sPresent comments  =
-                        let rows, comp = baseTypeIcdTas.createRowsFunc fieldName sPresent comments
-                        rows |> List.map getNewSType, comp
-                    icdFnc, baseTypeIcdTas.comments, name
-                | None -> emptyIcdFnc, [], name
+                        baseTypeIcdTas.createRowsFunc fieldName sPresent comments
+                    // A plain reference inherits the referenced type's embeddability,
+                    // so a reference to a collapsible SEQUENCE OF (roadmap D2) inlines
+                    // it into the parent just as an inline SEQUENCE OF child does
+                    // (e.g. deduced MyPDU.items -> TLVList).
+                    icdFnc, baseTypeIcdTas.comments, name, baseTypeIcdTas.canBeEmbedded
+                | None -> emptyIcdFnc, [], name, false
             | Some encOptions ->
+                let sContainerKind, sSizeUnit =
+                    match encOptions.octOrBitStr with
+                    | ContainedInOctString -> "OCTET STRING", "bytes"
+                    | ContainedInBitString -> "BIT STRING", "bits"
                 let lengthDetRow =
                     match encOptions.acnEncodingClass with
                     | SZ_EC_LENGTH_EMBEDDED nSizeInBits ->
-                        let sCommentUnit = match encOptions.octOrBitStr with ContainedInOctString -> "bytes" | ContainedInBitString -> "bits"
-                        [ {IcdRow.fieldName = "Length"; comments = [$"The number of {sCommentUnit} used in the encoding"]; sPresent="always";sType=IcdPlainType "INTEGER"; sConstraint=None; minLengthInBits = nSizeInBits ;maxLengthInBits=nSizeInBits;sUnits=None; rowType = IcdRowType.LengthDeterminantRow; idxOffset = None}]
+                        [ {IcdRow.fieldName = "Length"; comments = [$"The number of {sSizeUnit} used in the encoding"]; sPresent="always";sType=IcdPlainType "INTEGER"; sConstraint=None; minLengthInBits = nSizeInBits ;maxLengthInBits=nSizeInBits;sUnits=None; rowType = IcdRowType.LengthDeterminantRow; idxOffset = None}]
                     | _ -> []
+                let containingComments =
+                    let sCaption = $"%s{sContainerKind} containing the encoding of %s{o.tasName.Value}"
+                    match encOptions.acnEncodingClass with
+                    | SZ_EC_ExternalField relPath  -> [sCaption; $"Size in %s{sSizeUnit} is given by the external field %s{relPath.AsString}"]
+                    | SZ_EC_LENGTH_EMBEDDED _      -> [sCaption]    // the size source is documented by the Length row
+                    | SZ_EC_FIXED_SIZE             -> [sCaption]
+                    | SZ_EC_TerminationPattern _   -> [sCaption]
+                    | SZ_EC_Deduced                -> [sCaption]
                 match baseType.icdTas with
                 | Some baseTypeIcdTas ->
                     let icdFnc fieldName sPresent comments  =
-                        let rows0, compChildren = baseTypeIcdTas.createRowsFunc fieldName sPresent comments
-                        let rows = rows0 |> List.map getNewSType
+                        let rows, compChildren = baseTypeIcdTas.createRowsFunc fieldName sPresent comments
                         lengthDetRow@rows |> List.mapi(fun i rw -> {rw with idxOffset = Some (i+1)}), compChildren
-                    icdFnc, ("OCTET STING CONTAINING BY"::baseTypeIcdTas.comments), Some (t.id.AsString.RDD + "_OCT_STR")
-                | None -> emptyIcdFnc, [], None
-        | false -> emptyIcdFnc, [], None
+                    // A CONTAINING carrier keeps its own table and is never inlined
+                    // into its parent, even when the contained type is an embeddable
+                    // SEQUENCE OF / primitive: the octet/bit-string framing boundary
+                    // must stay visible (roadmap D2 "not the direct target of a
+                    // CONTAINING clause").
+                    icdFnc, (containingComments@baseTypeIcdTas.comments), Some (t.id.AsString.RDD + "_OCT_STR"), false
+                | None -> emptyIcdFnc, [], None, false
+        | false -> emptyIcdFnc, [], None, false
     match baseType.icdTas with
     | Some baseTypeIcdTas ->
-        Some {IcdArgAux.canBeEmbedded = baseTypeIcdTas.canBeEmbedded; baseAsn1Kind = (getASN1Name t); rowsFunc = icdFnc; commentsForTas=extraComment; scope="REFTYPE"; name=name}
+        Some {IcdArgAux.canBeEmbedded = refCanBeEmbedded; baseAsn1Kind = (getASN1Name t); rowsFunc = icdFnc; commentsForTas=extraComment; scope="REFTYPE"; name=name}
     | None -> None
 
 
@@ -95,6 +128,31 @@ let createReferenceFunction_inline (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnIn
       | false ->
             let funcBody (us:State) (errCode:ErrorCode) (acnArgs: (AcnGenericTypes.RelativePath*AcnGenericTypes.AcnParameter) list) (nestingScope: NestingScope) (p:CodegenScope) =
                 TL "ACN_REF_02" (fun () ->
+                //'size deduced': when fixed-size components follow this reference in its
+                //decoding region, the standalone function cannot be used on decode (its
+                //body assumes a zero trailing constant).  Emit the base type's body
+                //inline instead, so the usage-specific trailing constant flows in
+                //through the NestingScope (Docs/deduced-size-spec.md par.6.3).
+                match codec = Decode && nestingScope.deducedTrailingBits <> 0I && isLiveDeduced o.resolvedType with
+                | true ->
+                    match baseType.getAcnFunction codec with
+                    | Some baseFnc ->
+                        let res, ns = baseFnc.funcBody us acnArgs nestingScope p
+                        //The inlined body references the base TAS's own error-code constants
+                        //(they carry the base type's names, not usage-path names).  When the
+                        //base TAS lives in the same module those constants are already declared
+                        //next to the base TAS's own function: re-declaring them here would be a
+                        //benign duplicate #define in C but an illegal duplicate declaration in
+                        //Ada.  Cross-module usages keep the re-declaration (the generated Ada
+                        //bodies only 'with' sibling modules, so the local copy is what makes
+                        //the unqualified name visible -- same as the C duplicate #define).
+                        let res =
+                            match o.modName.Value = t.id.ModName with
+                            | true  -> res |> Option.map (fun rr -> {rr with errCodes = []})
+                            | false -> res
+                        res, ns
+                    | None         -> None, us
+                | false ->
                 let pp, resultExpr =
                     let str = lm.lg.getParamValue t p.accessPath codec
                     match codec, lm.lg.decodingKind with
@@ -156,7 +214,9 @@ let createReferenceFunction_inline (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnIn
                         match baseTypeAcnFunction with
                         | None  -> None, [], [], [], us
                         | Some baseTypeAcnFunction   ->
-                            let acnRes, ns = baseTypeAcnFunction.funcBody us acnArgs nestingScope p
+                            //CONTAINING boundary: the contained encoding is decoded against its own
+                            //region (the container's octets), so the trailing constant resets to 0
+                            let acnRes, ns = baseTypeAcnFunction.funcBody us acnArgs {nestingScope with deducedTrailingBits = 0I} p
                             match acnRes with
                             | None  -> None, [], [], [], ns
                             | Some r -> Some r.funcBody, r.errCodes, r.localVariables, r.userDefinedFunctions, ns
@@ -185,6 +245,7 @@ let createReferenceFunction_inline (r:Asn1AcnAst.AstRoot) (deps:Asn1AcnAst.AcnIn
                     let fncBody = bit_string_containing_func pp baseFncName sReqBytesForUperEncoding sReqBitForUperEncoding nBits encOptions.minSize.acn encOptions.maxSize.acn false codec
                     fncBody, [errCode],[], [], us
                 | SZ_EC_TerminationPattern nullVal  ,  _                    ->  raise(SemanticError (loc, "Invalid type for parameter4"))
+                | SZ_EC_Deduced                     ,  _                    ->  raise(SemanticError (loc, "'size deduced': backend code generation is not implemented yet"))
             let funcBodyResult = Some ({AcnFuncBodyResult.funcBody = funcBodyContent; userDefinedFunctions=userDefinedFunctions; errCodes = errCodes; localVariables = localVariables; bValIsUnReferenced= false; bBsIsUnReferenced=false; resultExpr=resultExpr; auxiliaries=[]; icdResult = icd})
             funcBodyResult, ns2)
 

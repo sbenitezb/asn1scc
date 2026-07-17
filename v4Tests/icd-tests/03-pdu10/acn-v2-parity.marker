@@ -1,0 +1,6 @@
+# Presence of this file opts the test dir into the v2-parity check
+# (runIcdTests.py): the -icdRaw JSON produced with --acn-v2 (deferred
+# patching / closure conversion) must be byte-identical to the legacy one.
+# pdu10 exercises closure conversion (cross-scope determinants in the empty
+# Header SEQUENCE + a CONTAINING PayloadData), which is exactly where the
+# internal transform used to leak into the ICD (roadmap B8).

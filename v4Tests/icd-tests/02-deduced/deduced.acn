@@ -1,0 +1,13 @@
+DEDUCED-TEST DEFINITIONS ::= BEGIN
+
+    MyInt [encoding pos-int, size 16]
+
+    TLVList [size deduced]
+
+    MyPDU [] {
+        hdr   [encoding pos-int, size 8],
+        items [],
+        crc   [encoding pos-int, size 32]
+    }
+
+END

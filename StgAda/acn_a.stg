@@ -80,18 +80,18 @@ procedure <sFuncName>_aux(<sVarName>:out <sTypeDefName>; bs : in out <rtlModuleN
 >>
 
 EmitTypeAssignment_primitive_decodeMain(sVarName, sStar, sFuncName, soIValidFuncName, sTypeDefName, arrsLocalVariables, sContent, soSparkAnnotations, sInitialExp, arrsAcnPrms, arrsAcnParamNames, bEmptyEncodingSpace) ::= /*nogen*/<<
-PROCEDURE <sFuncName>(<sVarName>: out <sTypeDefName>; Stream : in out <sTypeDefName>_ACN_Stream; result : OUT <rtlModuleName()>.ASN1_RESULT<if(arrsAcnPrms)>; <arrsAcnPrms; separator="; "><endif>) <if(arrsAcnPrms)>-- COVERAGE_IGNORE<endif>
+PROCEDURE <sFuncName>(<sVarName>: out <sTypeDefName>; Stream : in out <sTypeDefName>_ACN_Stream; result : OUT <rtlModuleName()>.ASN1_RESULT<if(arrsAcnPrms)>; <arrsAcnPrms; separator="; "><endif>) -- COVERAGE_IGNORE
 is
 begin
-    Stream.Current_Bit_Pos :=0; <if(arrsAcnPrms)>-- COVERAGE_IGNORE<endif>
-    <sFuncName>_aux(<sVarName>, Stream, result<if(arrsAcnParamNames)>, <arrsAcnParamNames; separator=","><endif>); <if(arrsAcnPrms)>-- COVERAGE_IGNORE<endif>
+    Stream.Current_Bit_Pos :=0; -- COVERAGE_IGNORE
+    <sFuncName>_aux(<sVarName>, Stream, result<if(arrsAcnParamNames)>, <arrsAcnParamNames; separator=","><endif>); -- COVERAGE_IGNORE
     <if(soIValidFuncName)>
-    if result.success then
-        result := <soIValidFuncName>(<sVarName>);
+    if result.success then -- COVERAGE_IGNORE
+        result := <soIValidFuncName>(<sVarName>); -- COVERAGE_IGNORE
     end if;
 
     <endif>
-end <sFuncName>; <if(arrsAcnPrms)>-- COVERAGE_IGNORE<endif>
+end <sFuncName>; -- COVERAGE_IGNORE
 >>
 
 EmitTypeAssignment_primitive_decode(sVarName, sStar, sFuncName, soIValidFuncName, sTypeDefName, arrsLocalVariables, sContent, soSparkAnnotations, sInitialExp, arrsAcnPrms, arrsAcnParamNames, bEmptyEncodingSpace, bBsIsUnreferenced, bVarNameIsUnreferenced, soInitFuncName, arrsAnnots, arrsPrecond, soPostcond) ::= <<
@@ -597,6 +597,36 @@ Real_64_little_endian_encode(p, sErrCode) ::= "adaasn1rtl.encoding.acn.Acn_Enc_R
 Real_64_little_endian_decode(p, sErrCode) ::= <<
 adaasn1rtl.encoding.acn.Acn_Dec_Real_IEEE754_64_little_endian(bs, <p>, result);
 result.ErrorCode := <sErrCode>;
+>>
+
+/* REAL encoded as scaled integer (issue #339): the real value is mapped linearly onto
+   the integer range and the bitstream work is delegated to the integer encoding (sIntBody) */
+Real_ScaledInt_uint_encode(p, sTmpVar, sIntBody, sLow, sScale, sUintMax, sErrCode) ::= <<
+<sTmpVar> := adaasn1rtl.encoding.acn.Acn_Real2ScaledUInt(<p>, <sLow>, <sScale>, <sUintMax>);
+<sIntBody>
+>>
+
+Real_ScaledInt_uint_decode(p, sTmpVar, sIntBody, sLow, sScale, sUintMax, sErrCode) ::= <<
+<sIntBody>
+if result.Success then
+    <p> := adaasn1rtl.encoding.acn.Acn_ScaledUInt2Real(<sTmpVar>, <sLow>, <sScale>);
+else
+    <p> := <sLow>;																				-- COVERAGE_IGNORE
+end if;
+>>
+
+Real_ScaledInt_sint_encode(p, sTmpVar, sIntBody, sLow, sScale, sIntMin, sIntMax, sErrCode) ::= <<
+<sTmpVar> := adaasn1rtl.encoding.acn.Acn_Real2ScaledSInt(<p>, <sLow>, <sScale>, <sIntMin>, <sIntMax>);
+<sIntBody>
+>>
+
+Real_ScaledInt_sint_decode(p, sTmpVar, sIntBody, sLow, sScale, sIntMin, sIntMax, sErrCode) ::= <<
+<sIntBody>
+if result.Success then
+    <p> := adaasn1rtl.encoding.acn.Acn_ScaledSInt2Real(<sTmpVar>, <sLow>, <sScale>, <sIntMin>);
+else
+    <p> := <sLow>;																				-- COVERAGE_IGNORE
+end if;
 >>
 
 
@@ -1335,10 +1365,15 @@ if result.success then
     --decode to the temporary bitstream buffer
 	adaasn1rtl.encoding.uper.BitStream_DecodeOctetString_no_length(bs, tmpBs.Buffer, Integer(<sExtField>), result.success);
 	if result.success then
-        --open new scope to declare some variables
-        declare
-            bs : adaasn1rtl.encoding.Bitstream := tmpBs;
+        --open new scope: the contained decoder must see a stream view limited
+        --to the actual region size ('size deduced' support)
+        declare --COVERAGE_IGNORE
+            bs : adaasn1rtl.encoding.Bitstream := adaasn1rtl.encoding.BitStream_init(Positive'Max(1, Integer(<sExtField>)));
         begin
+            if Integer(<sExtField>) = 0 then
+                bs.Current_Bit_Pos := 8;  --  empty region: no available bits --COVERAGE_IGNORE
+            end if;
+            bs.Buffer(1 .. Integer(<sExtField>)) := tmpBs.Buffer(1 .. Integer(<sExtField>));
             <soInner>
 			--<sFuncName>_aux(<p>, tmpBs, result);
         end;
@@ -1695,7 +1730,7 @@ end if;
 
 octet_string_containing_func_encode(p, sFuncName, sReqBytesForAcnEncoding, nBits, nMinSize, nMaxSize, bFixedSize) ::= <<
 --open new scope to declare some variables
-declare
+declare --COVERAGE_IGNORE
     tmpBs : adaasn1rtl.encoding.Bitstream := adaasn1rtl.encoding.BitStream_init(<sReqBytesForAcnEncoding>);
 	data_length : Integer;
 begin
@@ -1717,31 +1752,40 @@ end;
 
 octet_string_containing_func_decode(p, sFuncName, sReqBytesForAcnEncoding, nBits, nMinSize, nMaxSize, bFixedSize) ::= <<
 --open new scope to declare some variables
-declare
-    tmpBs : adaasn1rtl.encoding.Bitstream := adaasn1rtl.encoding.BitStream_init(<sReqBytesForAcnEncoding>);
-    <if(!bFixedSize)>
-	data_length : Integer;
-
-    <endif>
+<if(bFixedSize)>
+declare --COVERAGE_IGNORE
+	--decode to a temporary bitstream whose view is limited to the actual
+	--region size ('size deduced' support)
+    tmpBs : adaasn1rtl.encoding.Bitstream := adaasn1rtl.encoding.BitStream_init(Positive'Max(1, <nMinSize>));
 begin
-	--decode to a temporary bitstream
-	<if(bFixedSize)>
     adaasn1rtl.encoding.uper.BitStream_DecodeOctetString_no_length (bs, tmpBs.Buffer, <nMinSize>, result.success);
 	if result.success then
 		<sFuncName>_aux(<p>, tmpBs, result);
 	end if;
+end;
 
-	<else>
+<else>
+declare
+	data_length : Integer;
+begin
     adaasn1rtl.encoding.uper.UPER_Dec_ConstraintWholeNumberInt(bs, data_length, <nMinSize>, <nMaxSize>, <nBits>, result.success);
     if result.success then
-        adaasn1rtl.encoding.uper.BitStream_DecodeOctetString_no_length (bs, tmpBs.Buffer, data_length, result.success);
-	    if result.success then
-		    <sFuncName>_aux(<p>, tmpBs, result);
-	    end if;
+        --decode to a temporary bitstream whose view is limited to the actual
+        --region size ('size deduced' support)
+        declare --COVERAGE_IGNORE
+            tmpBs : adaasn1rtl.encoding.Bitstream := adaasn1rtl.encoding.BitStream_init(Positive'Max(1, data_length));
+        begin
+            if data_length = 0 then
+                tmpBs.Current_Bit_Pos := 8;  --  empty region: no available bits --COVERAGE_IGNORE
+            end if;
+            adaasn1rtl.encoding.uper.BitStream_DecodeOctetString_no_length (bs, tmpBs.Buffer, data_length, result.success);
+            if result.success then
+                <sFuncName>_aux(<p>, tmpBs, result);
+            end if;
+        end;
     end if;
-
-	<endif>
 end;
+<endif>
 >>
 
 
@@ -2029,3 +2073,96 @@ acn_deferred_det_type_name() ::= "adaasn1rtl.encoding.acn.AcnInsertedFieldRef"
    components auto-zero without an explicit aggregate, but the LocalVariable template
    always emits ":= <init>;", so we supply an aggregate that picks up every default). */
 acn_deferred_det_init_expr() ::= "(others =\> \<\>)"
+
+
+/* ------------------------------------------------------------------------- */
+/* 'size deduced' (Docs/deduced-size-spec.md): the element count is not      */
+/* encoded; the decoder derives it from the remaining bits of the enclosing  */
+/* decoding region.  Region end = end of the bitstream view minus the        */
+/* compile-time trailing constant (nTrailingBits).                           */
+/* ------------------------------------------------------------------------- */
+
+str_ascii_deduced_encode(p, sErrCode, nAsn1Max, nTrailingBits) ::= "adaasn1rtl.encoding.acn.Acn_Enc_String_Ascii_External_Field_Determinant(bs, <p>);"
+str_ascii_deduced_decode(p, sErrCode, nAsn1Max, nTrailingBits) ::= <<
+declare
+    Ded_Avail_Bits : constant Integer := (bs.Size_In_Bytes * 8 - <nTrailingBits>) - bs.Current_Bit_Pos;
+    Ded_Count : constant Integer := Ded_Avail_Bits / 8;
+begin
+    result := <rtlModuleName()>.ASN1_RESULT'(Success => Ded_Avail_Bits \>= 0 and then Ded_Count \<= <nAsn1Max>, ErrorCode => <sErrCode>);
+    if result.Success then
+        adaasn1rtl.encoding.acn.Acn_Dec_String_Ascii_External_Field_Determinant(bs, <rtlModuleName()>.Asn1Int(Ded_Count), <p>, result);
+        result.ErrorCode := <sErrCode>;
+    end if;
+end;
+>>
+
+oct_deduced_encode(sTypedefName, p, sAcc, noSizeMin, nSizeMax, nTrailingBits, sErrCode) ::= <<
+adaasn1rtl.encoding.uper.BitStream_EncodeOctetString_no_length(bs, <p><sAcc>Data, Integer(<p><sAcc>Length));
+>>
+
+oct_deduced_decode(sTypedefName, p, sAcc, noSizeMin, nSizeMax, nTrailingBits, sErrCode) ::= <<
+declare
+    Ded_Avail_Bits : constant Integer := (bs.Size_In_Bytes * 8 - <nTrailingBits>) - bs.Current_Bit_Pos;
+    Ded_Count : constant Integer := Ded_Avail_Bits / 8;
+begin
+    result := <rtlModuleName()>.ASN1_RESULT'(Success => Ded_Avail_Bits \>= 0 and then <if(noSizeMin)><noSizeMin> \<= Ded_Count and then <endif>Ded_Count \<= <nSizeMax>, ErrorCode => <sErrCode>);
+    if result.Success then
+        <p>.Length := Ded_Count;
+        adaasn1rtl.encoding.uper.BitStream_DecodeOctetString_no_length(bs, <p><sAcc>Data, Integer(<p><sAcc>Length), result.success);
+    end if;
+end;
+>>
+
+sqf_deduced_fix_elem_encode(sTypeDefName, p, sAcc, i, sInternalItem, noSizeMin, nSizeMax, nTrailingBits, nIntItemSize, sErrCode) ::= <<
+<loopFixedItem_enc(i=i, sInternalItem=sInternalItem, fixedSize=[p,".Length"], nfixedSizeUperLimit = nSizeMax, nCurOffset="0", nAlignSize="", nIntItemMinSize=nIntItemSize, nIntItemMaxSize=nIntItemSize)>
+>>
+
+sqf_deduced_fix_elem_decode(sTypeDefName, p, sAcc, i, sInternalItem, noSizeMin, nSizeMax, nTrailingBits, nIntItemSize, sErrCode) ::= <<
+declare
+    Ded_Avail_Bits : constant Integer := (bs.Size_In_Bytes * 8 - <nTrailingBits>) - bs.Current_Bit_Pos;
+    Ded_Count : constant Integer := Ded_Avail_Bits / <nIntItemSize>;
+begin
+    result := <rtlModuleName()>.ASN1_RESULT'(Success => Ded_Avail_Bits \>= 0 and then Ded_Avail_Bits - Ded_Count * <nIntItemSize> \< 8 and then <if(noSizeMin)><noSizeMin> \<= Ded_Count and then <endif>Ded_Count \<= <nSizeMax>, ErrorCode => <sErrCode>);
+    if result.Success then
+        <p>.Length := Ded_Count;
+        <loopFixedItem_dec(i=i, sInternalItem=sInternalItem, fixedSize=[p,".Length"], nfixedSizeUperLimit = nSizeMax, nCurOffset="0", nAlignSize="", nIntItemMinSize=nIntItemSize, nIntItemMaxSize=nIntItemSize)>
+    end if;
+end;
+>>
+
+sqf_deduced_var_elem_encode(sTypeDefName, p, sAcc, i, sInternalItem, noSizeMin, nSizeMax, nTrailingBits, nIntItemMinSize, sErrCode) ::= <<
+<i> := 1;
+while <i> \<= <p>.Length loop
+    pragma Loop_Invariant (<i> \>= 1 and <i> \<= <p>.Length);
+    pragma Loop_Invariant (bs.Current_Bit_Pos \>= bs.Current_Bit_Pos'Loop_Entry);
+    <sInternalItem>
+    <i> := <i> + 1;
+end loop;
+>>
+
+sqf_deduced_var_elem_decode(sTypeDefName, p, sAcc, i, sInternalItem, noSizeMin, nSizeMax, nTrailingBits, nIntItemMinSize, sErrCode) ::= <<
+declare
+    Ded_Budget_End : constant Integer := bs.Size_In_Bytes * 8 - <nTrailingBits>;
+begin
+    <i> := 1;
+    result := <rtlModuleName()>.ASN1_RESULT'(Success => bs.Current_Bit_Pos \<= Ded_Budget_End, ErrorCode => <sErrCode>);
+    while result.Success and then <i> \<= <nSizeMax> and then bs.Current_Bit_Pos + <nIntItemMinSize> \<= Ded_Budget_End loop
+        pragma Loop_Invariant (<i> \>= 1 and <i> \<= <nSizeMax>);
+        pragma Loop_Invariant (bs.Current_Bit_Pos \>= bs.Current_Bit_Pos'Loop_Entry);
+        pragma Loop_Invariant (bs.Current_Bit_Pos \<= Ded_Budget_End);
+        <sInternalItem>
+        if result.Success and then bs.Current_Bit_Pos \> Ded_Budget_End then
+            --  E1: the element overran the end of the decoding region
+            result := <rtlModuleName()>.ASN1_RESULT'(Success => False, ErrorCode => <sErrCode>); --COVERAGE_IGNORE
+        end if;
+        <i> := <i> + 1;
+    end loop;
+    if result.Success then
+        <p>.Length := <i> - 1;
+        if Ded_Budget_End - bs.Current_Bit_Pos \>= 8<if(noSizeMin)> or else <p>.Length \< <noSizeMin><endif> then
+            --  E2: at least one full byte of unaccounted data remains in the region
+            result := <rtlModuleName()>.ASN1_RESULT'(Success => False, ErrorCode => <sErrCode>); --COVERAGE_IGNORE
+        end if;
+    end if;
+end;
+>>

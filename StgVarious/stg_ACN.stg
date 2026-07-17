@@ -58,6 +58,7 @@ PP_Encoding_IEEE754_64() ::= "encoding IEEE754-1985-64"
 
 PP_Size_Auto() ::=  "size auto"
 PP_Size_NullTerminated() ::=  "size null-terminated"
+PP_Size_Deduced() ::=  "size deduced"
 PP_Size_Fixed(nFixedValue) ::= "size <nFixedValue>"
 PP_Sixe_Fld(sLongFld) ::= "size <sLongFld>"
 

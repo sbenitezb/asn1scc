@@ -50,6 +50,16 @@ type IcdRowType =
     | ReferenceToCompositeTypeRow
     | LengthDeterminantRow
     | PresentDeterminantRow
+    // 0 .. alignment-1 bits inserted in front of a type carrying the ACN
+    // align-to-next property; prepended by the alignment wrappers in
+    // BackendAst/Acn/AcnAlignment.fs (roadmap B3).
+    | PaddingRow
+    // A repeated-element row of a SEQUENCE OF that has been collapsed into its
+    // parent's row group (roadmap D2).  Rendered indented and sub-numbered
+    // ("N.k") under the SEQUENCE OF's header FieldRow, and treated as
+    // transparent by the parent's bit-offset fold (the header row already
+    // carries the SEQUENCE OF's full size range).
+    | SubItemRow
     | ThreeDOTs
 
 type IcdRow = {
@@ -74,6 +84,17 @@ type IcdRow = {
 // the child IcdTypeAss is included in the list of the returned IcdTypeAss
 type IcdInnerTableFunc = string-> string -> string list -> ((IcdRow list)*(IcdTypeAss list))
 
+// Type of an ACN parameter as presented in the ICD (the "ACN Parameters"
+// rows above a parameterized type's table, e.g. PayloadData<buffer-len>).
+and IcdAcnParameterType =
+    | IcdPrmBasic  of string          // INTEGER / BOOLEAN / NULL — plain text label
+    | IcdPrmRefTas of string*string   // modName, tasName — links to that TAS's table when it is emitted
+
+and IcdAcnParameter = {
+    name    : string
+    prmType : IcdAcnParameterType
+}
+
 and IcdTypeAss = {
     typeId  : ReferenceToType
     tasInfo : TypeAssignmentInfo option
@@ -82,6 +103,9 @@ and IcdTypeAss = {
     name : string
     kind : string
     comments : string list
+    // The ACN parameters of a parameterized type (empty for ordinary types).
+    // They are part of the rendered table and therefore of the MD5 identity.
+    acnParameters : IcdAcnParameter list
     rows : IcdRow list
     compositeChildren : IcdTypeAss list
     minLengthInBytes : BigInteger
@@ -452,11 +476,16 @@ type NestingScope = {
     // When a parent SEQUENCE has a post-encoding/pre-decoding function, this holds its
     // bitStreamPositions local variable name so nested SEQUENCEs can use it for save-position fields.
     parentSavePositionVar: string option
+    // 'size deduced' support: total ACN size in bits of all components that follow the
+    // current node up to the enclosing decoding-region boundary (CONTAINING container or
+    // top-level PDU).  Compile-time constant by the region rules of Docs/deduced-size-spec.md.
+    // The budget end of a deduced decode loop is <end of bitstream> - deducedTrailingBits.
+    deducedTrailingBits: bigint
 } with
     static member init (acnOuterMaxSize: bigint) (uperOuterMaxSize: bigint) (parents: (CodegenScope * Asn1AcnAst.Asn1Type) list): NestingScope =
         {acnOuterMaxSize = acnOuterMaxSize; uperOuterMaxSize = uperOuterMaxSize; nestingLevel = 0I; nestingIx = 0I;
         acnRelativeOffset = 0I; uperRelativeOffset = 0I; acnOffset = 0I; uperOffset = 0I; acnSiblingMaxSize = None; uperSiblingMaxSize = None;
-        parents = parents; parentSavePositionVar = None}
+        parents = parents; parentSavePositionVar = None; deducedTrailingBits = 0I}
     member this.isInit: bool = this.nestingLevel = 0I && this.nestingIx = 0I
 
 type UPERFuncBodyResult = {

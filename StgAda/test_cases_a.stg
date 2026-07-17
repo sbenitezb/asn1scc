@@ -102,6 +102,24 @@ stream.Current_Bit_Pos :=0;
 ret := <rtlModuleName()>.TEST_CASE_RESULT'(Step => <rtlModuleName()>.TC_DECODE, Success => result.Success, ErrorCode => result.ErrorCode);
 >>
 
+Codec_Decode_exact_length(sModName, sFuncName, sTasName, sEnc, sAmber) ::= <<
+--  Decode value ('size deduced' PDU): the decoder derives element counts from
+--  the end of the bitstream view, so it must see a stream whose Size_In_Bytes
+--  equals the actual encoded length (not the worst-case size of 'stream')
+declare
+    encLen    : constant Natural := adaasn1rtl.encoding.BitStream_current_length_in_bytes(stream);
+    decStream : adaasn1rtl.encoding.Bitstream := adaasn1rtl.encoding.BitStream_init(Positive'Max(1, encLen));
+begin
+    decStream.Buffer(1 .. encLen) := stream.Buffer(1 .. encLen);
+    if encLen = 0 then
+        --  empty PDU encoding: place the cursor at the end of the (1-byte) view
+        decStream.Current_Bit_Pos := 8;
+    end if;
+    <sModName>.<sFuncName>_aux(decodedPDU, decStream, result);
+end;
+ret := <rtlModuleName()>.TEST_CASE_RESULT'(Step => <rtlModuleName()>.TC_DECODE, Success => result.Success, ErrorCode => result.ErrorCode);
+>>
+
 Codec_Decode_XER(sModName, sFuncName, sTasName, sEnc, sAmber) ::= <<
 --  Decode value
 --  at this point stream contains the <sEnc> data

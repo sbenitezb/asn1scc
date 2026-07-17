@@ -1,0 +1,287 @@
+{
+  "navOrder": [
+    "MyInt@DEDUCED-TEST.MyInt",
+    "TLVList@DEDUCED-TEST.TLVList",
+    "MyPDU@DEDUCED-TEST.MyPDU"
+  ],
+  "tables": [
+    {
+      "id": "MyInt@DEDUCED-TEST.MyInt",
+      "name": "MyInt",
+      "kind": "INTEGER",
+      "tasInfo": {
+        "modName": "DEDUCED-TEST",
+        "tasName": "MyInt"
+      },
+      "module": "DEDUCED-TEST",
+      "usagePath": "DEDUCED-TEST.MyInt",
+      "usageSites": [
+        "DEDUCED-TEST.MyInt"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 2,
+      "maxLengthInBytes": 2,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(0 .. 16383)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TLVList@DEDUCED-TEST.TLVList",
+      "name": "TLVList",
+      "kind": "SEQUENCE OF",
+      "tasInfo": {
+        "modName": "DEDUCED-TEST",
+        "tasName": "TLVList"
+      },
+      "module": "DEDUCED-TEST",
+      "usagePath": "DEDUCED-TEST.TLVList",
+      "usageSites": [
+        "DEDUCED-TEST.MyPDU.items",
+        "DEDUCED-TEST.TLVList"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 0,
+      "maxLengthInBytes": 200,
+      "comments": [
+        "Length is deduced from the size of the enclosing container/PDU (no length determinant is encoded)."
+      ],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "Item #1",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (MyInt)"
+          },
+          "sConstraint": "(0 .. 16383)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": ""
+          },
+          "sConstraint": null,
+          "minLengthInBits": 0,
+          "maxLengthInBits": 0,
+          "sUnits": null,
+          "rowType": "ThreeDOTs",
+          "offset": {
+            "kind": "none",
+            "minBits": null,
+            "maxBits": null,
+            "display": null
+          }
+        },
+        {
+          "idxOffset": 100,
+          "fieldName": "Item #100",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (MyInt)"
+          },
+          "sConstraint": "(0 .. 16383)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "variable",
+            "minBits": null,
+            "maxBits": null,
+            "display": "variable"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MyPDU@DEDUCED-TEST.MyPDU",
+      "name": "MyPDU",
+      "kind": "SEQUENCE",
+      "tasInfo": {
+        "modName": "DEDUCED-TEST",
+        "tasName": "MyPDU"
+      },
+      "module": "DEDUCED-TEST",
+      "usagePath": "DEDUCED-TEST.MyPDU",
+      "usageSites": [
+        "DEDUCED-TEST.MyPDU"
+      ],
+      "hasAcnDefinition": true,
+      "minLengthInBytes": 5,
+      "maxLengthInBytes": 205,
+      "comments": [],
+      "acnParameters": [],
+      "rows": [
+        {
+          "idxOffset": 1,
+          "fieldName": "hdr",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(0 .. 255)",
+          "minLengthInBits": 8,
+          "maxLengthInBits": 8,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 0,
+            "maxBits": 0,
+            "display": "0"
+          }
+        },
+        {
+          "idxOffset": 2,
+          "fieldName": "items",
+          "comments": [
+            "Length is deduced from the size of the enclosing container/PDU (no length determinant is encoded)."
+          ],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "SEQUENCE OF"
+          },
+          "sConstraint": "(0 .. 100)",
+          "minLengthInBits": 0,
+          "maxLengthInBits": 1600,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "exact",
+            "minBits": 8,
+            "maxBits": 8,
+            "display": "8"
+          }
+        },
+        {
+          "idxOffset": 1,
+          "fieldName": "items[1]",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (MyInt)"
+          },
+          "sConstraint": "(0 .. 16383)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "SubItemRow",
+          "offset": {
+            "kind": "none",
+            "minBits": null,
+            "maxBits": null,
+            "display": null
+          }
+        },
+        {
+          "idxOffset": null,
+          "fieldName": "",
+          "comments": [],
+          "sPresent": "",
+          "sType": {
+            "kind": "plain",
+            "value": ""
+          },
+          "sConstraint": null,
+          "minLengthInBits": 0,
+          "maxLengthInBits": 0,
+          "sUnits": null,
+          "rowType": "ThreeDOTs",
+          "offset": {
+            "kind": "none",
+            "minBits": null,
+            "maxBits": null,
+            "display": null
+          }
+        },
+        {
+          "idxOffset": 100,
+          "fieldName": "items[100]",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER (MyInt)"
+          },
+          "sConstraint": "(0 .. 16383)",
+          "minLengthInBits": 16,
+          "maxLengthInBits": 16,
+          "sUnits": null,
+          "rowType": "SubItemRow",
+          "offset": {
+            "kind": "none",
+            "minBits": null,
+            "maxBits": null,
+            "display": null
+          }
+        },
+        {
+          "idxOffset": 3,
+          "fieldName": "crc",
+          "comments": [],
+          "sPresent": "always",
+          "sType": {
+            "kind": "plain",
+            "value": "INTEGER"
+          },
+          "sConstraint": "(0 .. 4294967295)",
+          "minLengthInBits": 32,
+          "maxLengthInBits": 32,
+          "sUnits": null,
+          "rowType": "FieldRow",
+          "offset": {
+            "kind": "range",
+            "minBits": 8,
+            "maxBits": 1608,
+            "display": "8..1608"
+          }
+        }
+      ]
+    }
+  ]
+}

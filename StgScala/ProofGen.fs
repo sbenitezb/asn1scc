@@ -36,11 +36,13 @@ let fromAcnSizeProps (sizeProps: AcnStringSizeProperty): SizeProps =
   match sizeProps with
   | StrExternalField _ -> ExternalField
   | StrNullTerminated pat -> AsciiNullTerminated pat
+  | StrDeduced -> failwith "'size deduced' is not supported for Scala"
 
 let fromSizeableProps (sizeProps: AcnSizeableSizeProperty): SizeProps =
   match sizeProps with
   | SzExternalField _ -> ExternalField
   | SzNullTerminated pat -> BitsNullTerminated pat.Value
+  | SzDeduced -> failwith "'size deduced' is not supported for Scala"
 
 let stringLikeSizeExpr (sizeProps: SizeProps option) (minNbElems: bigint) (maxNbElems: bigint) (charSize: bigint) (strLength: Expr): Expr =
   // TODO: check if we need to consider the encoded size (determinant) or not
